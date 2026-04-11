@@ -184,7 +184,7 @@ var module = `{
         "address": "223.5.5.5", //中国大陆域名使用阿里的 DNS
         "port": 53,
         "domains": [
-          "geosite:cn",
+          "ext:/etc/v2sub/geosite.dat:cn",
           "ntp.org"   // NTP 服务器
         ]
       },
@@ -192,7 +192,7 @@ var module = `{
         "address": "114.114.114.114", //中国大陆域名使用 114 的 DNS (备用)
         "port": 53,
         "domains": [
-          "geosite:cn",
+          "ext:/etc/v2sub/geosite.dat:cn",
           "ntp.org"   // NTP 服务器
         ]
       },
@@ -200,14 +200,14 @@ var module = `{
         "address": "8.8.8.8", //非中国大陆域名使用 Google 的 DNS
         "port": 53,
         "domains": [
-          "geosite:geolocation-!cn"
+          "ext:/etc/v2sub/geosite.dat:geolocation-!cn"
         ]
       },
       {
         "address": "1.1.1.1", //非中国大陆域名使用 Cloudflare 的 DNS
         "port": 53,
         "domains": [
-          "geosite:geolocation-!cn"
+          "ext:/etc/v2sub/geosite.dat:geolocation-!cn"
         ]
       }
     ]
@@ -236,7 +236,7 @@ var module = `{
       { // 广告拦截
         "type": "field", 
         "domain": [
-          "geosite:category-ads-all"
+          "ext:/etc/v2sub/geosite.dat:category-ads-all"
         ],
         "outboundTag": "block"
       },
@@ -256,7 +256,7 @@ var module = `{
       { // 直连中国大陆主流网站域名
         "type": "field", 
         "domain": [
-          "geosite:cn"
+          "ext:/etc/v2sub/geosite.dat:cn"
         ],
         "outboundTag": "direct"
       },
