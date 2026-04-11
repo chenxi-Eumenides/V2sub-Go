@@ -85,7 +85,7 @@ func startV2ray() {
 
 	var err error
 	if useNewV2rayVersion() {
-		err = command.RunSync(v2rayBinPath, "run", "-c", conf.GetV2rayConfigPath(), "--datadir", "/etc/v2sub")
+		err = command.RunSync(v2rayBinPath, "run", "-c", conf.GetV2rayConfigPath(), "-d", "/etc/v2sub")
 	} else {
 		err = command.RunSync(v2rayBinPath, "-config", conf.GetV2rayConfigPath())
 	}
