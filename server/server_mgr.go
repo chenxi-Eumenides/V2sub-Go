@@ -41,6 +41,11 @@ func ParseArgs(args []string) {
 }
 
 func SpeedTestAll(setDefaultConfigFlag bool) {
+	if len(conf.ServerConfigNow.ServerList) == 0 {
+		log.E("no servers available for speed test")
+		return
+	}
+
 	fmt.Println("=======================================================")
 	fmt.Println(
 		putil.F("ID", 4),
@@ -52,6 +57,11 @@ func SpeedTestAll(setDefaultConfigFlag bool) {
 	)
 
 	speedTestResultServer := SortBySpeedTest(conf.ServerConfigNow.ServerList)
+
+	if len(speedTestResultServer) == 0 {
+		log.E("speed test failed, no results available")
+		return
+	}
 
 	for _, speedServer := range speedTestResultServer {
 		server := speedServer.VServer
@@ -79,43 +89,40 @@ func SpeedTestAll(setDefaultConfigFlag bool) {
 	}
 	fmt.Println("=======================================================")
 
-	if len(speedTestResultServer) > 0 {
-		fastServer := speedTestResultServer[0].VServer
-		for i, server := range conf.ServerConfigNow.ServerList {
-			if fastServer.Vmess.Ps == server.Vmess.Ps && fastServer.Vmess.Port == server.Vmess.Port &&
-				fastServer.Vmess.Add == server.Vmess.Add {
+	fastServer := speedTestResultServer[0].VServer
+	for i, server := range conf.ServerConfigNow.ServerList {
+		if fastServer.Vmess.Ps == server.Vmess.Ps && fastServer.Vmess.Port == server.Vmess.Port &&
+			fastServer.Vmess.Add == server.Vmess.Add {
 
-				fmt.Println("最快节点为")
-				if i == conf.ServerConfigNow.Id {
-					fmt.Println(
-						putil.F("["+strconv.Itoa(i)+"]", 4),
-						putil.F(server.Vmess.Ps, 50),
-						putil.F(server.Vmess.Add, 24),
-						putil.F(server.Vmess.Port, 10),
-						putil.F(server.Vmess.Net, 5),
-					)
-				} else {
-					fmt.Println(
-						putil.F(" "+strconv.Itoa(i), 4),
-						putil.F(server.Vmess.Ps, 50),
-						putil.F(server.Vmess.Add, 24),
-						putil.F(server.Vmess.Port, 10),
-						putil.F(server.Vmess.Net, 5),
-					)
-				}
-
-				if setDefaultConfigFlag {
-					log.I()
-					log.I("set default server id : " + strconv.Itoa(i))
-					conf.ServerConfigNow.Id = i
-					conf.FlushConfig()
-				}
-
-				return
+			fmt.Println("最快节点为")
+			if i == conf.ServerConfigNow.Id {
+				fmt.Println(
+					putil.F("["+strconv.Itoa(i)+"]", 4),
+					putil.F(server.Vmess.Ps, 50),
+					putil.F(server.Vmess.Add, 24),
+					putil.F(server.Vmess.Port, 10),
+					putil.F(server.Vmess.Net, 5),
+				)
+			} else {
+				fmt.Println(
+					putil.F(" "+strconv.Itoa(i), 4),
+					putil.F(server.Vmess.Ps, 50),
+					putil.F(server.Vmess.Add, 24),
+					putil.F(server.Vmess.Port, 10),
+					putil.F(server.Vmess.Net, 5),
+				)
 			}
+
+			if setDefaultConfigFlag {
+				log.I()
+				log.I("set default server id : " + strconv.Itoa(i))
+				conf.ServerConfigNow.Id = i
+				conf.FlushConfig()
+			}
+
+			return
 		}
 	}
-
 }
 
 type VServerSpeedSort struct {
@@ -180,13 +187,17 @@ func SaveDefaultConfig(id string) {
 	index, _ := strconv.Atoi(id)
 	if index >= len(conf.ServerConfigNow.ServerList) || index < 0 {
 		log.E("config id error")
-		//os.Exit(-1)
 		return
 	}
-	conf.ServerConfigNow.Id = index
 
-	// 刷新配置
+	// 先尝试生成配置，成功后再保存
 	vmess, configJson := ParseVmessLink(conf.ServerConfigNow.ServerList[index].Source)
+	if vmess == nil || configJson == "" {
+		log.E("parse vmess config failed, config not saved")
+		return
+	}
+
+	conf.ServerConfigNow.Id = index
 	conf.ServerConfigNow.ServerList[index].Vmess = *vmess
 	conf.ServerConfigNow.ServerList[index].ConfigJson = configJson
 
