@@ -1,11 +1,10 @@
 # v2sub
+
 linux 上面 v2ray 订阅管理工具, 支持获取 vmess 订阅
 
 帮助自己在 linux 上面订阅 [JustMySocks](https://justmysocks.net/members/aff.php?aff=18111)
 
 v2sub 是命令行工具，支持在 linux 下命令行运行，也可以交叉编译之后直接放在软路由里面跑
-
-如果想要在更加方便的进行远程控制的话，推荐使用带有 http api 的 [v2sub-w](./README-Web.md)
 
 ## 功能支持
 ```
@@ -14,8 +13,6 @@ v2sub 是命令行工具，支持在 linux 下命令行运行，也可以交叉�
         添加一个订阅，订阅节点自动增加到 ser list
     -sub update {name} 
         更新一个订阅
-    -sub customer {sub_name} {customer_result} 
-        手动更新一个订阅, customer_result 是 sub 地址返回的加密字符串
     -sub update all 
         更新全部订阅结果
     -sub remove {name} 
@@ -42,16 +39,36 @@ v2sub 是命令行工具，支持在 linux 下命令行运行，也可以交叉�
         http 端口号管理， 默认1081
     -conf lconn {true|false} 
         是否允许来自局域网的连接，默认为 false
+    -conf bypasslan {true|false}
+        绕过局域网（直连），不经过代理，默认为 false
     -conf list
-        展示当前的 port、lconn 配置
+        展示当前的 port、lconn、bypasslan 配置
   
 连接
     -conn start 
-        启用 v2ray 连接 server    
+        启用 v2ray 连接 server
     -conn start-pac
         启用 v2ray 连接 server，并同时在 :23333/v2sub.pac 返回 /etc/v2sub/v2sub.pac 文件
     -conn kill 
         停止 v2ray （kill 掉其他 v2sub 和 v2ray）
+
+规则管理
+    -rule update
+        从 Loyalsoldier/v2ray-rules-dat 下载最新的 geosite.dat
+    -rule proxy
+        查看当前自定义 proxy 域名规则
+    -rule proxy add {domain}
+        添加域名到 proxy 规则（走代理）
+    -rule proxy remove {domain}
+        从 proxy 规则中移除域名
+    -rule direct
+        查看当前自定义 direct 域名规则
+    -rule direct add {domain}
+        添加域名到 direct 规则（直连）
+    -rule direct remove {domain}
+        从 direct 规则中移除域名
+    -rule list
+        查看所有自定义域名规则
 
 其他
     -v, --version
@@ -61,6 +78,7 @@ v2sub 是命令行工具，支持在 linux 下命令行运行，也可以交叉�
 ```
 
 ## 使用说明
+
 请确保已安装 v2ray 到 /usr/local/bin/v2ray (v2fly 安装脚本默认安装位置)
 
 先使用 `go build v2sub.go` 编译得到运行文件 `./v2sub`
@@ -96,39 +114,80 @@ v2sub 是命令行工具，支持在 linux 下命令行运行，也可以交叉�
 # 3   JMS@xxx.jamjams.net:11111                          xxx.xxx.xxx.xxx         52623      tcp
 #=======================================================
 
-# 查看当前连接配置, 包括 socks 端口 / http 端口 / 局域网连接
+# 查看当前连接配置
 ./v2sub -conf list
-#[v2sub-INFO] [0803-205402] Config SocksPort:       1080
-#[v2sub-INFO] [0803-205402] Config HttpPort:        1081
-#[v2sub-INFO] [0803-205402] Config AllLocalConnect: false
 
 # 将 http 代理端口设置为 10800
 ./v2sub -conf hport 10800
+
 # 允许来自局域网的设备连接代理
 ./v2sub -conf lconn true
+
+# 启用绕过局域网（局域网 IP 直连，不走代理）
+./v2sub -conf bypasslan true
 
 # 杀死当前正在运行的 v2ray 和 v2sub 程序
 ./v2sub -conn kill
 
 # 调用 /usr/local/bin/v2ray 程序连接刚刚设置节点
 ./v2sub -conn start
-
 ```
 
-## 配置文件生成
+## 规则管理
+
+### 下载 geosite 数据
+
+```shell
+# 从 Loyalsoldier/v2ray-rules-dat 下载最新的 geosite.dat
+./v2sub -rule update
+```
+
+geosite.dat 会保存到 `/etc/v2sub/geosite.dat`，启动 v2ray 时会自动使用。
+
+### 自定义域名规则
+
+```shell
+# 添加域名到 proxy 规则（走代理）
+./v2sub -rule proxy add google.com
+./v2sub -rule proxy add github.com
+
+# 添加域名到 direct 规则（直连）
+./v2sub -rule direct add baidu.com
+./v2sub -rule direct add *.baidu.com
+
+# 查看所有规则
+./v2sub -rule list
+
+# 从规则中移除域名
+./v2sub -rule proxy remove google.com
+./v2sub -rule direct remove baidu.com
+```
+
+自定义域名规则保存在 `/etc/v2sub/rules.json`。
+
+## 配置文件
+
 v2ray 的配置文件由模板 json 生成，可自己修改模板 json 来设置路由等信息
 
-模板 json 在第一次运行之后会输出到 `/etc/v2sub/config_module.json`
-
+配置文件保存在 `/etc/v2sub/` 目录：
+- `config.json` - 当前 v2ray 配置文件
+- `config_module.json` - v2ray 配置模板
+- `server.json` - 节点配置
+- `sub.json` - 订阅配置
+- `rules.json` - 自定义域名规则
+- `geosite.dat` - geosite 数据文件
 
 ## 定时订阅脚本
 
-首先将 v2sub 移动到 /ush/bin
+首先将 v2sub 移动到 /usr/bin
 
 可用以下脚本做开机自启 / cron 定时任务
 
 ```shell
 #!/bin/bash
+
+# 更新 geosite 数据
+v2sub -rule update
 
 # 更新全部订阅结果
 v2sub -sub updateall
@@ -141,10 +200,10 @@ v2sub -conn kill
 
 # 启动 v2ray 连接
 v2sub -conn start
-
 ```
 
 ## 命令行补全
+
 v2sub 带有 `v2sub-completion.bash` 脚本
 支持命令行补全
 

@@ -3,22 +3,37 @@ package ajax
 import (
 	"bytes"
 	"encoding/json"
-	"github.com/Ericwyn/v2sub/utils/log"
 	"io"
 	"io/ioutil"
 	"mime/multipart"
 	"net/http"
 	"net/url"
+	"os"
 	"strings"
+
+	"github.com/Ericwyn/v2sub/utils/log"
 )
 
 type Method string
 
-//const
 const POST Method = "POST"
 const GET Method = "GET"
 
-var client = &http.Client{} //客户端,被Get,Head以及Post使用
+func newClient() *http.Client {
+	tr := &http.Transport{}
+	proxyURL := os.Getenv("HTTP_PROXY")
+	if proxyURL == "" {
+		proxyURL = os.Getenv("http_proxy")
+	}
+	if proxyURL != "" {
+		if pu, err := url.Parse(proxyURL); err == nil {
+			tr.Proxy = http.ProxyURL(pu)
+		}
+	}
+	return &http.Client{Transport: tr}
+}
+
+var client = newClient()
 
 type Request struct {
 	Url    string

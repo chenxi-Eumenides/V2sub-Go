@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"github.com/Ericwyn/v2sub/conf"
 	"github.com/Ericwyn/v2sub/conn"
+	"github.com/Ericwyn/v2sub/rule"
 	"github.com/Ericwyn/v2sub/server"
 	"github.com/Ericwyn/v2sub/sub"
 	"github.com/Ericwyn/v2sub/utils/log"
@@ -45,6 +46,8 @@ func parseArg(args []string) {
 		server.ParseArgs(args[1:])
 	case "-conn":
 		conn.ParseArgs(args[1:])
+	case "-rule":
+		rule.ParseArgs(args[1:])
 	default:
 		log.E("param error, use -h can get the params help")
 		os.Exit(-1)
@@ -84,8 +87,10 @@ func printArgsHelp() {
         http 端口号管理， 默认1081
     -conf lconn {true|false} 
         是否允许来自局域网的连接，默认为 false
+    -conf bypasslan {true|false}
+        绕过局域网（直连），不经过代理，默认为 false
     -conf list
-        展示当前的 port、lconn 配置
+        展示当前的 port、lconn、bypasslan 配置
   
 连接
     -conn start 
@@ -94,6 +99,24 @@ func printArgsHelp() {
         启用 v2ray 连接 server，并同时在 :23333/v2sub.pac 返回 /etc/v2sub/v2sub.pac 文件
     -conn kill 
         停止 v2ray （kill 掉其他 v2sub 和 v2ray）
+
+规则管理
+    -rule update
+        从 Loyalsoldier/v2ray-rules-dat 下载最新的 geosite.dat
+    -rule proxy
+        查看当前自定义 proxy 域名规则
+    -rule proxy add {domain}
+        添加域名到 proxy 规则（走代理）
+    -rule proxy remove {domain}
+        从 proxy 规则中移除域名
+    -rule direct
+        查看当前自定义 direct 域名规则
+    -rule direct add {domain}
+        添加域名到 direct 规则（直连）
+    -rule direct remove {domain}
+        从 direct 规则中移除域名
+    -rule list
+        查看所有自定义域名规则
 
 其他
     -v, --version

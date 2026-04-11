@@ -22,11 +22,16 @@ func ParseArgs(args []string) {
 		param.AssistParamLength(args, 2)
 		setLocalConnEnable(args[1])
 		break
+	case "bypasslan": // -conf bypasslan true 绕过局域网
+		param.AssistParamLength(args, 2)
+		setBypassLan(args[1])
+		break
 	case "list": // -conf list 允许来自局域网的连接
 		param.AssistParamLength(args, 1)
 		log.I("Config SocksPort:       ", ServerConfigNow.SocksPort)
 		log.I("Config HttpPort:        ", ServerConfigNow.HttpPort)
 		log.I("Config AllLocalConnect: ", ServerConfigNow.AllowLocalConnect)
+		log.I("Config BypassLan:       ", ServerConfigNow.BypassLan)
 
 		break
 	default:
@@ -72,5 +77,22 @@ func setLocalConnEnable(enableFlag string) {
 
 	log.I("set AllowLocalConnect to : ", enable)
 	ServerConfigNow.AllowLocalConnect = enable
+	FlushConfig()
+}
+
+func setBypassLan(enableFlag string) {
+	enableFlag = strings.ToLower(enableFlag)
+	enable := false
+	if enableFlag == "t" || enableFlag == "true" || enableFlag == "1" {
+		enable = true
+	} else if enableFlag == "f" || enableFlag == "false" || enableFlag == "0" {
+		enable = false
+	} else {
+		log.E("bypasslan flag error, plase input true|false, flag now : " + enableFlag)
+		return
+	}
+
+	log.I("set BypassLan to : ", enable)
+	ServerConfigNow.BypassLan = enable
 	FlushConfig()
 }

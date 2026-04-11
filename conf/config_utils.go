@@ -14,6 +14,7 @@ import (
 var initFlag = false
 var serverConfigName = "server.json"
 var subConfigName = "sub.json"
+var ruleConfigName = "rules.json"
 
 // 从本地读取配置文件
 func LoadLocalConfig() {
@@ -44,6 +45,8 @@ func LoadLocalConfig() {
 			ServerConfigNow.ServerList = make([]VServer, 0)
 		}
 
+		loadRuleConfig()
+
 		initFlag = true
 		log.I("load config msg success")
 	}
@@ -70,5 +73,31 @@ func writeLocalConfig(subMap map[string]VSub, serverList ServerConfig) {
 		panic(err)
 	} else {
 		storage.WriteConfigFileLocal(string(serversJson), serverConfigName)
+	}
+}
+
+func loadRuleConfig() {
+	ruleConfigBytes := storage.ReadConfigFileLocal(ruleConfigName)
+	if string(ruleConfigBytes) != "" {
+		err := json.Unmarshal(ruleConfigBytes, &RuleConfigNow)
+		if err != nil {
+			log.E("parse rule config file to json error")
+		}
+	}
+	if RuleConfigNow.Proxy == nil {
+		RuleConfigNow.Proxy = make([]string, 0)
+	}
+	if RuleConfigNow.Direct == nil {
+		RuleConfigNow.Direct = make([]string, 0)
+	}
+}
+
+func FlushRuleConfig() {
+	ruleJson, err := json.MarshalIndent(RuleConfigNow, "", "    ")
+	if err != nil {
+		log.E("general rule config json error")
+		panic(err)
+	} else {
+		storage.WriteConfigFileLocal(string(ruleJson), ruleConfigName)
 	}
 }

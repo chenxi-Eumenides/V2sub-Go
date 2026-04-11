@@ -2,10 +2,12 @@ package conn
 
 import (
 	"fmt"
+	"net/http"
 	"os"
 	"os/exec"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/Ericwyn/GoTools/file"
 	"github.com/Ericwyn/v2sub/conf"
@@ -13,9 +15,6 @@ import (
 	"github.com/Ericwyn/v2sub/utils/log"
 	"github.com/Ericwyn/v2sub/utils/param"
 	"github.com/Ericwyn/v2sub/utils/putil"
-	"github.com/gin-gonic/gin"
-	"net/http"
-	"time"
 )
 
 const v2rayBinPath = "/usr/local/bin/v2ray"
@@ -86,7 +85,7 @@ func startV2ray() {
 
 	var err error
 	if useNewV2rayVersion() {
-		err = command.RunSync(v2rayBinPath, "run", "-c", conf.GetV2rayConfigPath())
+		err = command.RunSync(v2rayBinPath, "run", "-c", conf.GetV2rayConfigPath(), "--datadir", "/etc/v2sub")
 	} else {
 		err = command.RunSync(v2rayBinPath, "-config", conf.GetV2rayConfigPath())
 	}
@@ -115,16 +114,12 @@ func readPacConfigFile() {
 }
 
 func startPacServerOnly() {
-	router := gin.Default()
-	router.GET("v2sub.pac", func(context *gin.Context) {
-		//context.String(200, "utf-8", pacText)
-		context.File(pacFilePath)
+	http.HandleFunc("/v2sub.pac", func(w http.ResponseWriter, r *http.Request) {
+		http.ServeFile(w, r, pacFilePath)
 	})
 
-	//return
 	s := &http.Server{
 		Addr:           ":23333",
-		Handler:        router,
 		ReadTimeout:    10 * time.Second,
 		WriteTimeout:   10 * time.Second,
 		MaxHeaderBytes: 1 << 20,

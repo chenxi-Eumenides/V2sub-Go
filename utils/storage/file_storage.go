@@ -259,7 +259,22 @@ var module = `{
           "geosite:cn"
         ],
         "outboundTag": "direct"
-      }
+      },
+      { // 自定义 proxy 域名规则
+        "type": "field",
+        "domain": [
+          "{customProxyDomains}"
+        ],
+        "outboundTag": "proxy"
+      },
+      { // 自定义 direct 域名规则
+        "type": "field",
+        "domain": [
+          "{customDirectDomains}"
+        ],
+        "outboundTag": "direct"
+      },
+      {bypassLanRule}
     ]
   }
 }

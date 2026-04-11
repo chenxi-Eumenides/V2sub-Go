@@ -14,6 +14,7 @@ type ServerConfig struct {
 	SocksPort         int // socks port
 	HttpPort          int // https port
 	AllowLocalConnect bool
+	BypassLan         bool // 绕过局域网，不走代理
 	ServerList        []VServer
 }
 
@@ -68,8 +69,47 @@ func parseVmessJson(vmess VmessJson) string {
 	module = strings.Replace(module, "{Aid}", strconv.Itoa(vmess.Aid), 1)
 	module = strings.Replace(module, "{Port}", vmess.Port, 1)
 	module = strings.Replace(module, "{Net}", vmess.Net, 1)
-	//module = strings.Replace(module, "{}", vmess.Type, 1)
-	//module = strings.Replace(module, "{}", vmess.TLS, 1)
+
+	proxyDomains := buildDomainList(RuleConfigNow.Proxy)
+	directDomains := buildDomainList(RuleConfigNow.Direct)
+
+	module = strings.Replace(module, "{customProxyDomains}", proxyDomains, 1)
+	module = strings.Replace(module, "{customDirectDomains}", directDomains, 1)
+
+	bypassLanRules := buildBypassLanRules()
+	module = strings.Replace(module, "{bypassLanRule}", bypassLanRules, 1)
 
 	return module
+}
+
+func buildBypassLanRules() string {
+	if !ServerConfigNow.BypassLan {
+		return ""
+	}
+	return `      {` + "\n" +
+		`        "type": "field",` + "\n" +
+		`        "ip": [` + "\n" +
+		`          "geoip:private",` + "\n" +
+		`          "geoip:cn",` + "\n" +
+		`          "127.0.0.0/8",` + "\n" +
+		`          "10.0.0.0/8",` + "\n" +
+		`          "172.16.0.0/12",` + "\n" +
+		`          "192.168.0.0/16"` + "\n" +
+		`        ],` + "\n" +
+		`        "outboundTag": "direct"` + "\n" +
+		`      }`
+}
+
+func buildDomainList(domains []string) string {
+	if len(domains) == 0 {
+		return "\"localhost\\.invalid\\.v2sub\\.placeholder\""
+	}
+	result := ""
+	for i, d := range domains {
+		if i > 0 {
+			result += ", "
+		}
+		result += "\"" + d + "\""
+	}
+	return result
 }
