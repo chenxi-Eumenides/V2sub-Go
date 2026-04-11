@@ -94,7 +94,7 @@ func UpdateGeoSite() {
 }
 
 func AddDomain(ruleType string, domain string) {
-	domain = strings.ToLower(strings.TrimSpace(domain))
+	domain = normalizeDomain(domain)
 	if domain == "" {
 		log.E("domain cannot be empty")
 		return
@@ -120,7 +120,7 @@ func AddDomain(ruleType string, domain string) {
 }
 
 func RemoveDomain(ruleType string, domain string) {
-	domain = strings.ToLower(strings.TrimSpace(domain))
+	domain = normalizeDomain(domain)
 
 	var list *[]string
 	if ruleType == "proxy" {
@@ -147,6 +147,38 @@ func RemoveDomain(ruleType string, domain string) {
 	*list = newList
 	conf.FlushRuleConfig()
 	log.I("removed '", domain, "' from ", ruleType, " rules")
+}
+
+func normalizeDomain(domain string) string {
+	domain = strings.ToLower(strings.TrimSpace(domain))
+	if domain == "" {
+		return ""
+	}
+
+	// 去除协议前缀 http:// 或 https://
+	if strings.HasPrefix(domain, "http://") {
+		domain = domain[7:]
+	} else if strings.HasPrefix(domain, "https://") {
+		domain = domain[8:]
+	}
+
+	// 去除路径部分，只保留域名
+	if idx := strings.Index(domain, "/"); idx != -1 {
+		domain = domain[:idx]
+	}
+
+	// 去除开头的 www.
+	if strings.HasPrefix(domain, "www.") {
+		domain = domain[4:]
+	}
+
+	// 如果已经有 domain:、regexp:、keyword:、geosite: 等前缀，不再添加
+	if strings.Contains(domain, ":") {
+		return domain
+	}
+
+	// 添加 domain: 前缀
+	return "domain:" + domain
 }
 
 func ListProxyRules() {

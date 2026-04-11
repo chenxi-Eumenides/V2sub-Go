@@ -102,7 +102,7 @@ func buildBypassLanRules() string {
 
 func buildDomainList(domains []string) string {
 	if len(domains) == 0 {
-		return "\"localhost\\.invalid\\.v2sub\\.placeholder\""
+		return ""
 	}
 	result := ""
 	for i, d := range domains {
