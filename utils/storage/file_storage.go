@@ -1,7 +1,8 @@
 package storage
 
 import (
-	"errors"
+	"os"
+
 	"github.com/Ericwyn/GoTools/file"
 	"github.com/Ericwyn/v2sub/utils/log"
 )
@@ -10,14 +11,15 @@ import (
 
 const configDirPath = "/etc/v2sub"
 
+func InitConfigDir() error {
+	return os.MkdirAll(configDirPath, 0755)
+}
+
 // 写文件
 func WriteConfigFileLocal(data string, fileName string) {
+	_ = os.MkdirAll(configDirPath, 0755)
+
 	dir := file.OpenFile(configDirPath)
-
-	if !dir.Exits() {
-		file.CreateDir(configDirPath)
-	}
-
 	configFile := file.OpenFile(dir.AbsPath() + "/" + fileName)
 
 	// 直接删除，再重写，解决写文件错乱的问题
@@ -34,17 +36,12 @@ func WriteConfigFileLocal(data string, fileName string) {
 
 // 读文件
 func ReadConfigFileLocal(fileName string) []byte {
+	_ = os.MkdirAll(configDirPath, 0755)
 	dir := file.OpenFile(configDirPath)
-	if !dir.Exits() {
-		log.E("config dir " + configDirPath + " path not exits")
-		err := errors.New("config dir " + configDirPath + " path not exits")
-		panic(err)
-	}
 	configFile := file.OpenFile(dir.AbsPath() + "/" + fileName)
 	read, err := configFile.Read()
 	if err != nil {
 		log.E("read config file: " + configFile.AbsPath() + " error")
-		//panic(err)
 	}
 	return read
 }
@@ -52,12 +49,8 @@ func ReadConfigFileLocal(fileName string) []byte {
 var moduleFileName string = "config_module.json"
 
 func LoadV2ConfigModule() string {
+	_ = os.MkdirAll(configDirPath, 0755)
 	dir := file.OpenFile(configDirPath)
-	if !dir.Exits() {
-		log.E("config dir " + configDirPath + " path not exits")
-		err := errors.New("config dir " + configDirPath + " path not exits")
-		panic(err)
-	}
 	configFile := file.OpenFile(dir.AbsPath() + "/" + moduleFileName)
 	read, err := configFile.Read()
 	if err == nil && string(read) != "" {
@@ -78,10 +71,8 @@ func GetConfigDirPath() string {
 }
 
 func createV2ConfigModule() {
+	_ = os.MkdirAll(configDirPath, 0755)
 	dir := file.OpenFile(configDirPath)
-	if !dir.Exits() {
-		file.CreateDir(configDirPath)
-	}
 	configFile := file.OpenFile(dir.AbsPath() + "/" + moduleFileName)
 	err := configFile.Write(file.W_NEW, []string{module})
 	if err != nil {
@@ -184,7 +175,7 @@ var module = `{
         "address": "223.5.5.5", //中国大陆域名使用阿里的 DNS
         "port": 53,
         "domains": [
-          "ext:/etc/v2sub/geosite.dat:cn",
+          "geosite:cn",
           "ntp.org"   // NTP 服务器
         ]
       },
@@ -192,7 +183,7 @@ var module = `{
         "address": "114.114.114.114", //中国大陆域名使用 114 的 DNS (备用)
         "port": 53,
         "domains": [
-          "ext:/etc/v2sub/geosite.dat:cn",
+          "geosite:cn",
           "ntp.org"   // NTP 服务器
         ]
       },
@@ -200,14 +191,14 @@ var module = `{
         "address": "8.8.8.8", //非中国大陆域名使用 Google 的 DNS
         "port": 53,
         "domains": [
-          "ext:/etc/v2sub/geosite.dat:geolocation-!cn"
+          "geosite:geolocation-!cn"
         ]
       },
       {
         "address": "1.1.1.1", //非中国大陆域名使用 Cloudflare 的 DNS
         "port": 53,
         "domains": [
-          "ext:/etc/v2sub/geosite.dat:geolocation-!cn"
+          "geosite:geolocation-!cn"
         ]
       }
     ]
@@ -236,7 +227,7 @@ var module = `{
       { // 广告拦截
         "type": "field", 
         "domain": [
-          "ext:/etc/v2sub/geosite.dat:category-ads-all"
+          "geosite:category-ads-all"
         ],
         "outboundTag": "block"
       },
@@ -256,7 +247,7 @@ var module = `{
       { // 直连中国大陆主流网站域名
         "type": "field", 
         "domain": [
-          "ext:/etc/v2sub/geosite.dat:cn"
+          "geosite:cn"
         ],
         "outboundTag": "direct"
       },
