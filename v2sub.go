@@ -23,6 +23,12 @@ func main() {
 		os.Exit(0)
 	}
 
+	// -init 初始化命令，在 LoadLocalConfig 之前运行
+	if bootArgs[1] == "-init" {
+		runInit()
+		return
+	}
+
 	conf.LoadLocalConfig()
 
 	// 解析 args，依据不同的 args 进行不同的业务
@@ -118,10 +124,12 @@ func printArgsHelp() {
     -rule list
         查看所有自定义域名规则
 
-其他
+ 其他
     -v, --version
         查看版本号
     -h, --help
         查看帮助说明
+    -init
+        初始化 v2sub 运行环境（创建目录、检测 v2ray、写入默认配置、下载 geosite.dat）
 `)
 }
