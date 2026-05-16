@@ -17,8 +17,6 @@ import (
 	"github.com/Ericwyn/v2sub/utils/putil"
 )
 
-const v2rayBinPath = "/usr/local/bin/v2ray"
-
 var pacFilePath = "/etc/v2sub/v2sub.pac"
 
 var defaultPacText = `
@@ -47,11 +45,13 @@ func ParseArgs(args []string) {
 }
 
 func checkV2ray() {
-	vtoo := file.OpenFile(v2rayBinPath)
-	if !vtoo.Exits() {
-		log.E("can't find v2ray bin in " + v2rayBinPath)
+	path, err := FindV2ray()
+	if err != nil {
+		log.E("can't find v2ray: ", err.Error())
+		log.E("please install v2ray or set V2RAY_PATH environment variable")
 		os.Exit(-1)
 	}
+	log.I("found v2ray at: ", path)
 }
 
 func startV2ray() {
@@ -83,11 +83,12 @@ func startV2ray() {
 	fmt.Println()
 	fmt.Println()
 
+	v2rayBin, _ := GetV2rayBinPath()
 	var err error
 	if useNewV2rayVersion() {
-		err = command.RunSync(v2rayBinPath, "run", "-c", conf.GetV2rayConfigPath())
+		err = command.RunSync(v2rayBin, "run", "-c", conf.GetV2rayConfigPath())
 	} else {
-		err = command.RunSync(v2rayBinPath, "-config", conf.GetV2rayConfigPath())
+		err = command.RunSync(v2rayBin, "-config", conf.GetV2rayConfigPath())
 	}
 
 	if err != nil {
@@ -164,7 +165,8 @@ func KillV2Sub() {
 // 旧版本可以使用 v2ray -version / v2ray -config xxxxxx.json
 // 新版本只能使用 v2ray version / v2ray run -c xxxxx.json
 func useNewV2rayVersion() bool {
-	result, err := command.RunResult("v2ray -version")
+	v2rayBin, _ := GetV2rayBinPath()
+	result, err := command.RunResult(v2rayBin + " -version")
 	if err != nil {
 		log.I("check new v2ray version, 'v2ray -version' get error msg, use new v2ray version cmd")
 		return true
