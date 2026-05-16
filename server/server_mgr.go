@@ -1,51 +1,60 @@
 package server
 
 import (
+	"encoding/json"
 	"fmt"
-	"github.com/Ericwyn/v2sub/conf"
-	"github.com/Ericwyn/v2sub/utils/command"
-	"github.com/Ericwyn/v2sub/utils/decode"
-	"github.com/Ericwyn/v2sub/utils/log"
-	"github.com/Ericwyn/v2sub/utils/param"
-	"github.com/Ericwyn/v2sub/utils/putil"
-	"os"
 	"sort"
 	"strconv"
 	"strings"
 	"sync"
+
+	"github.com/Ericwyn/v2sub/conf"
+	"github.com/Ericwyn/v2sub/utils/command"
+	"github.com/Ericwyn/v2sub/utils/decode"
+	"github.com/Ericwyn/v2sub/utils/log"
+	"github.com/Ericwyn/v2sub/utils/putil"
 )
 
 func ParseArgs(args []string) {
-	param.AssistParamLength(args, 1)
+	if len(args) < 1 {
+		return
+	}
 	switch args[0] {
-	case "setflush": // -ser setflush 将当前选中的节点输出到 /etc/v2sub/config.json
-		param.AssistParamLength(args, 1)
-		SaveDefaultConfig(strconv.Itoa(conf.ServerConfigNow.Id))
-		break
-	case "set": // 设置某个配置作为 v2ray 启动配置
-		param.AssistParamLength(args, 2)
-		SaveDefaultConfig(args[1])
-		break
-	case "setx": // -ser setx 测试 + 设置节点为最快节点
+	case "set":
+		if len(args) < 2 {
+			fmt.Println("用法: -ser set {ID}")
+			return
+		}
+		setServer(args[1])
+	case "setx":
 		SpeedTestAll(true)
-		break
-	case "speedtest": // -ser speedtest 测试
+	case "speedtest":
 		SpeedTestAll(false)
-		break
 	case "list":
-		ListServer()
-		os.Exit(0)
+		listServer()
 	default:
-		log.E("sub args error")
+		log.E("ser 参数错误")
 	}
 }
 
-func SpeedTestAll(setDefaultConfigFlag bool) {
-	if len(conf.ServerConfigNow.ServerList) == 0 {
-		log.E("no servers available for speed test")
+func setServer(idStr string) {
+	index, err := strconv.Atoi(idStr)
+	if err != nil || index < 0 || index >= len(conf.GlobalSer.Sub) {
+		fmt.Println("无效 ID:", idStr)
 		return
 	}
+	conf.GlobalSer.Current.Index = index
+	conf.GlobalSer.Current.SubName = conf.GlobalSer.Sub[index].SubName
+	conf.SaveConfig()
+	fmt.Println("已设置默认节点:", index)
+}
 
+func listServer() {
+	if len(conf.GlobalSer.Sub) == 0 {
+		fmt.Println("没有可用节点")
+		fmt.Println("请先使用 -sub add 添加订阅")
+		return
+	}
 	fmt.Println("=======================================================")
 	fmt.Println(
 		putil.F("ID", 4),
@@ -53,220 +62,114 @@ func SpeedTestAll(setDefaultConfigFlag bool) {
 		putil.F("地址", 24),
 		putil.F("端口", 10),
 		putil.F("类型", 5),
-		putil.F("测速", 5),
 	)
+	for i, entry := range conf.GlobalSer.Sub {
+		mark := " "
+		if i == conf.GlobalSer.Current.Index && entry.SubName == conf.GlobalSer.Current.SubName {
+			mark = "["
+		}
+		fmt.Println(
+			putil.F(mark+strconv.Itoa(i)+"]", 4),
+			putil.F(entry.Vmess.Ps, 50),
+			putil.F(entry.Vmess.Addr, 24),
+			putil.F(entry.Vmess.Port, 10),
+			putil.F(entry.Vmess.Type, 5),
+		)
+	}
+	fmt.Println("=======================================================")
+}
 
-	speedTestResultServer := SortBySpeedTest(conf.ServerConfigNow.ServerList)
+type SpeedSortEntry struct {
+	Speed float64
+	Index int
+	Entry conf.SerSubEntry
+}
 
-	if len(speedTestResultServer) == 0 {
-		log.E("speed test failed, no results available")
+func SpeedTestAll(setFastest bool) {
+	if len(conf.GlobalSer.Sub) == 0 {
+		log.E("没有可用节点进行测速")
 		return
 	}
 
-	for _, speedServer := range speedTestResultServer {
-		server := speedServer.VServer
-		speedMs := speedServer.Speed
-		i := speedServer.Index
-		if i == conf.ServerConfigNow.Id {
-			fmt.Println(
-				putil.F("["+strconv.Itoa(i)+"]", 4),
-				putil.F(server.Vmess.Ps, 50),
-				putil.F(server.Vmess.Add, 24),
-				putil.F(server.Vmess.Port, 10),
-				putil.F(server.Vmess.Net, 5),
-				putil.F(fmt.Sprint(speedMs)+" ms", 5),
-			)
-		} else {
-			fmt.Println(
-				putil.F(" "+strconv.Itoa(i), 4),
-				putil.F(server.Vmess.Ps, 50),
-				putil.F(server.Vmess.Add, 24),
-				putil.F(server.Vmess.Port, 10),
-				putil.F(server.Vmess.Net, 5),
-				putil.F(fmt.Sprint(speedMs)+" ms", 5),
-			)
+	fmt.Println("=======================================================")
+	fmt.Println(putil.F("ID", 4), putil.F("别名", 50), putil.F("地址", 24), putil.F("端口", 10), putil.F("类型", 5), putil.F("测速", 5))
+
+	results := sortBySpeed(conf.GlobalSer.Sub)
+	if len(results) == 0 {
+		log.E("测速失败")
+		return
+	}
+
+	for _, r := range results {
+		mark := " "
+		if r.Index == conf.GlobalSer.Current.Index && r.Entry.SubName == conf.GlobalSer.Current.SubName {
+			mark = "["
 		}
+		fmt.Println(
+			putil.F(mark+strconv.Itoa(r.Index)+"]", 4),
+			putil.F(r.Entry.Vmess.Ps, 50),
+			putil.F(r.Entry.Vmess.Addr, 24),
+			putil.F(r.Entry.Vmess.Port, 10),
+			putil.F(r.Entry.Vmess.Net, 5),
+			putil.F(fmt.Sprint(r.Speed)+" ms", 5),
+		)
 	}
 	fmt.Println("=======================================================")
 
-	fastServer := speedTestResultServer[0].VServer
-	for i, server := range conf.ServerConfigNow.ServerList {
-		if fastServer.Vmess.Ps == server.Vmess.Ps && fastServer.Vmess.Port == server.Vmess.Port &&
-			fastServer.Vmess.Add == server.Vmess.Add {
-
-			fmt.Println("最快节点为")
-			if i == conf.ServerConfigNow.Id {
-				fmt.Println(
-					putil.F("["+strconv.Itoa(i)+"]", 4),
-					putil.F(server.Vmess.Ps, 50),
-					putil.F(server.Vmess.Add, 24),
-					putil.F(server.Vmess.Port, 10),
-					putil.F(server.Vmess.Net, 5),
-				)
-			} else {
-				fmt.Println(
-					putil.F(" "+strconv.Itoa(i), 4),
-					putil.F(server.Vmess.Ps, 50),
-					putil.F(server.Vmess.Add, 24),
-					putil.F(server.Vmess.Port, 10),
-					putil.F(server.Vmess.Net, 5),
-				)
-			}
-
-			if setDefaultConfigFlag {
-				log.I()
-				log.I("set default server id : " + strconv.Itoa(i))
-				conf.ServerConfigNow.Id = i
-				conf.FlushConfig()
-			}
-
-			return
-		}
+	if setFastest && len(results) > 0 {
+		best := results[0]
+		conf.GlobalSer.Current.Index = best.Index
+		conf.GlobalSer.Current.SubName = best.Entry.SubName
+		conf.SaveConfig()
+		fmt.Println("已设置最快节点为:", best.Entry.Vmess.Ps)
 	}
 }
 
-type VServerSpeedSort struct {
-	Speed   float64
-	Index   int
-	VServer conf.VServer
-}
-
-// 直接获取一个速度排序，阻塞式，不输出文件
-func SortBySpeedTest(serverList []conf.VServer) []VServerSpeedSort {
-	// 对着一堆 ServerList 进行排序
-	speedList := make([]VServerSpeedSort, 0)
+func sortBySpeed(list []conf.SerSubEntry) []SpeedSortEntry {
 	var wg sync.WaitGroup
-	for i, server := range serverList {
-		server := server
-		i := i
+	results := make([]SpeedSortEntry, 0)
+	for i, entry := range list {
 		wg.Add(1)
-		// 协程执行 Ping
+		i, entry := i, entry
 		go func() {
-			speedMs := Get3PingMs(server.Vmess.Add, 8)
-			speedList = append(speedList, VServerSpeedSort{
-				Speed:   speedMs,
-				VServer: server,
-				Index:   i,
-			})
+			ms := pingMs(entry.Vmess.Addr, 8)
+			results = append(results, SpeedSortEntry{Speed: ms, Index: i, Entry: entry})
 			wg.Done()
 		}()
 	}
 	wg.Wait()
-	sort.Slice(speedList, func(i, j int) bool {
-		return speedList[i].Speed-speedList[j].Speed < 0
+	sort.Slice(results, func(i, j int) bool {
+		return results[i].Speed-results[j].Speed < 0
 	})
-	return speedList
+	return results
 }
 
-// 获取一个 host 的 ping 延时，阻塞，可用 timeout 设置超时
-func Get3PingMs(host string, timeoutSeconds int) float64 {
-	//执行 ping -c 3 baidu.com | grep '^rtt' | awk -F"/" '{print $5F}'
-	result, err := command.RunResult("timeout " + strconv.Itoa(timeoutSeconds) + " ping -c 3 " + host + " | grep '^rtt' | awk -F\"/\" '{print $5F}'")
-	if err == nil {
-		result = strings.Replace(result, " ", "", -1)
-		result = strings.Replace(result, "\n", "", -1)
-		result = strings.Replace(result, "\r", "", -1)
-		speedMs, err := strconv.ParseFloat(result, 64)
-		if err != nil {
-			//return -1
-			log.E("ping error")
-			log.E(err)
-			return 9999
-		} else {
-			return speedMs
-		}
-	} else {
-		log.E("ping error")
-		log.E(err)
+func pingMs(host string, timeout int) float64 {
+	out, err := command.RunResult(fmt.Sprintf("timeout %d ping -c 3 %s | grep '^rtt' | awk -F\"/\" '{print $5F}'", timeout, host))
+	if err != nil {
 		return 9999
 	}
+	out = strings.TrimSpace(out)
+	ms, err := strconv.ParseFloat(out, 64)
+	if err != nil {
+		return 9999
+	}
+	return ms
 }
 
-func SaveDefaultConfig(id string) {
-	fmt.Println("save v2ray config to /etc/v2sub/config.json")
-	index, _ := strconv.Atoi(id)
-	if index >= len(conf.ServerConfigNow.ServerList) || index < 0 {
-		log.E("config id error")
-		return
+func ParseVmessLink(vmessStr string) *conf.VmessJson {
+	if !strings.HasPrefix(vmessStr, "vmess://") {
+		return nil
 	}
-
-	// 先尝试生成配置，成功后再保存
-	vmess, configJson := ParseVmessLink(conf.ServerConfigNow.ServerList[index].Source)
-	if vmess == nil || configJson == "" {
-		log.E("parse vmess config failed, config not saved")
-		return
+	b64 := vmessStr[8:]
+	jsonStr := decode.VmessBase64Decode(b64)
+	if jsonStr == "" {
+		return nil
 	}
-
-	conf.ServerConfigNow.Id = index
-	conf.ServerConfigNow.ServerList[index].Vmess = *vmess
-	conf.ServerConfigNow.ServerList[index].ConfigJson = configJson
-
-	conf.FlushConfig()
-	conf.SaveDefaultServerConfig(conf.ServerConfigNow.ServerList[index])
-
-	fmt.Println("save success")
-}
-
-func ListServer() {
-	fmt.Println("=======================================================")
-	fmt.Println(
-		putil.F("ID", 4),
-		putil.F("别名", 50),
-		putil.F("地址", 24),
-		putil.F("端口", 10),
-		putil.F("类型", 5),
-	)
-	for i, config := range conf.ServerConfigNow.ServerList {
-		if i == conf.ServerConfigNow.Id {
-			fmt.Println(
-				putil.F("["+strconv.Itoa(i)+"]", 4),
-				putil.F(config.Vmess.Ps, 50),
-				putil.F(config.Vmess.Add, 24),
-				putil.F(config.Vmess.Port, 10),
-				putil.F(config.Vmess.Type, 5),
-			)
-		} else {
-			fmt.Println(
-				putil.F(" "+strconv.Itoa(i), 4),
-				putil.F(config.Vmess.Ps, 50),
-				putil.F(config.Vmess.Add, 24),
-				putil.F(config.Vmess.Port, 10),
-				putil.F(config.Vmess.Type, 5),
-			)
-		}
+	var vmess conf.VmessJson
+	if err := json.Unmarshal([]byte(jsonStr), &vmess); err != nil {
+		log.E("parse vmess json fail")
+		return nil
 	}
-	fmt.Println("=======================================================")
-
-}
-
-// 解析 vmess 链接， 得到具体 vmess 配置信息以及
-// 以及一个 v2ray 的 config json
-func ParseVmessLink(vmessStr string) (*conf.VmessJson, string) {
-	if strings.Index(vmessStr, "vmess://") == 0 {
-		vmessBase64 := vmessStr[8:len(vmessStr)] // 去除前缀
-		vmessJson := decode.VmessBase64Decode(vmessBase64)
-		log.I("get vmess json: ", vmessJson)
-		// 通过 vmess 链接来获取 config.VServer 对象
-		vmessJsonObj, configJson := conf.ParseVmessConfigToConfigJson(vmessJson)
-
-		// 设置 http 和 socks 的链接
-		configJson = strings.Replace(configJson, "{sPort}",
-			strconv.Itoa(conf.ServerConfigNow.SocksPort),
-			1)
-
-		configJson = strings.Replace(configJson, "{hPort}",
-			strconv.Itoa(conf.ServerConfigNow.HttpPort),
-			1)
-
-		// 设置是否允许来自局域网的连接
-		bindAddr := "127.0.0.1"
-		if conf.ServerConfigNow.AllowLocalConnect {
-			bindAddr = "0.0.0.0"
-		}
-		configJson = strings.Replace(configJson, "{bindAddr}", bindAddr, -1)
-
-		return vmessJsonObj, configJson
-	} else {
-		return nil, ""
-	}
+	return &vmess
 }

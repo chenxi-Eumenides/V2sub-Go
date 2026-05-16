@@ -15,6 +15,7 @@ import (
 	"github.com/Ericwyn/v2sub/utils/log"
 	"github.com/Ericwyn/v2sub/utils/param"
 	"github.com/Ericwyn/v2sub/utils/putil"
+	"github.com/Ericwyn/v2sub/utils/storage"
 )
 
 var pacFilePath = "/etc/v2sub/v2sub.pac"
@@ -29,19 +30,112 @@ function FindProxyForURL(url, host) {
 func ParseArgs(args []string) {
 	param.AssistParamLength(args, 1)
 	switch args[0] {
-
-	case "start": // -conn start 启动 v2ray
+	case "start":
 		startV2ray()
 		fmt.Println("v2ray 已停止")
-	case "kill": // -conn stop 停止其他正在运行的 v2ray 和 v2sub
+	case "kill":
 		KillV2Sub()
-	case "start-pac": // -conn start-pac 启动 v2ray 的同时开启 23333/v2sub.pac 返回
+	case "start-pac":
 		readPacConfigFile()
 		go startPacServerOnly()
 		startV2ray()
 	default:
-		log.E("sub args error")
+		log.E("conn 参数错误")
 	}
+}
+
+func startV2ray() {
+	log.I("start v2ray ......")
+	checkV2ray()
+
+	runConfig := conf.GlobalSer.Sub[conf.GlobalSer.Current.Index]
+
+	generateConfig(runConfig)
+
+	log.I("use config is :   ↓ ↓ ↓ ↓ ↓ ↓ ↓ ↓ ↓ ↓ ")
+	log.I("========================================================================")
+	log.I(putil.F("ID", 4), putil.F("别名", 50), putil.F("地址", 24), putil.F("端口", 10), putil.F("类型", 5))
+	log.I(putil.F(" ["+strconv.Itoa(conf.GlobalSer.Current.Index)+"]", 4),
+		putil.F(runConfig.Vmess.Ps, 50),
+		putil.F(runConfig.Vmess.Addr, 24),
+		putil.F(runConfig.Vmess.Port, 10),
+		putil.F(runConfig.Vmess.Type, 5))
+	log.I("========================================================================")
+
+	configPath := storage.GetConfigDirPath() + "/config.json"
+	log.I("v2ray config path : " + configPath)
+	fmt.Println()
+	fmt.Println()
+
+	v2rayBin, _ := GetV2rayBinPath()
+	var err error
+	if useNewV2rayVersion() {
+		err = command.RunSync(v2rayBin, "run", "-c", configPath)
+	} else {
+		err = command.RunSync(v2rayBin, "-config", configPath)
+	}
+	if err != nil {
+		log.E("start v2ray error...")
+		log.E(err.Error())
+		os.Exit(-1)
+	}
+}
+
+func generateConfig(entry conf.SerSubEntry) {
+	module := storage.LoadV2ConfigModule()
+
+	module = strings.Replace(module, "{Add}", entry.Vmess.Addr, 1)
+	module = strings.Replace(module, "{Port}", entry.Vmess.Port, 1)
+	module = strings.Replace(module, "{ID}", entry.Vmess.ID, 1)
+	module = strings.Replace(module, "{Aid}", strconv.Itoa(entry.Vmess.Aid), 1)
+	module = strings.Replace(module, "{Net}", entry.Vmess.Net, 1)
+
+	module = strings.Replace(module, "{sPort}", strconv.Itoa(conf.GlobalConf.SocksPort), 1)
+	module = strings.Replace(module, "{hPort}", strconv.Itoa(conf.GlobalConf.HttpPort), 1)
+	bindAddr := "127.0.0.1"
+	if conf.GlobalConf.AllowLocalConnect {
+		bindAddr = "0.0.0.0"
+	}
+	module = strings.Replace(module, "{bindAddr}", bindAddr, -1)
+
+	proxyDomains := buildDomainList(conf.GlobalRule.Proxy)
+	directDomains := buildDomainList(conf.GlobalRule.Direct)
+	module = strings.Replace(module, "{customProxyDomains}", proxyDomains, 1)
+	module = strings.Replace(module, "{customDirectDomains}", directDomains, 1)
+
+	module = strings.Replace(module, "{bypassLanRule}", buildBypassLanRule(), 1)
+
+	storage.WriteConfigFileLocal(module, "config.json")
+}
+
+func buildDomainList(domains []string) string {
+	if len(domains) == 0 {
+		return ""
+	}
+	parts := make([]string, len(domains))
+	for i, d := range domains {
+		parts[i] = `"` + d + `"`
+	}
+	return strings.Join(parts, ", ")
+}
+
+func buildBypassLanRule() string {
+	if !conf.GlobalConf.BypassLan {
+		return ""
+	}
+	return `,
+      {
+        "type": "field",
+        "ip": [
+          "geoip:private",
+          "geoip:cn",
+          "127.0.0.0/8",
+          "10.0.0.0/8",
+          "172.16.0.0/12",
+          "192.168.0.0/16"
+        ],
+        "outboundTag": "direct"
+      }`
 }
 
 func checkV2ray() {
@@ -54,52 +148,7 @@ func checkV2ray() {
 	log.I("found v2ray at: ", path)
 }
 
-func startV2ray() {
-	log.I("start v2ray ......")
-
-	checkV2ray()
-
-	// 输出当前配置
-	runConfig := conf.ServerConfigNow.ServerList[conf.ServerConfigNow.Id]
-	conf.SaveDefaultServerConfig(runConfig)
-
-	log.I("use config is :   ↓ ↓ ↓ ↓ ↓ ↓ ↓ ↓ ↓ ↓ ")
-	log.I("========================================================================")
-	log.I(
-		putil.F("ID", 4),
-		putil.F("别名", 50),
-		putil.F("地址", 24),
-		putil.F("端口", 10),
-		putil.F("类型", 5),
-	)
-	log.I(putil.F(" "+strconv.Itoa(conf.ServerConfigNow.Id), 4),
-		putil.F(runConfig.Vmess.Ps, 50),
-		putil.F(runConfig.Vmess.Add, 24),
-		putil.F(runConfig.Vmess.Port, 10),
-		putil.F(runConfig.Vmess.Type, 5))
-	log.I("========================================================================")
-
-	log.I("v2ray config path : " + conf.GetV2rayConfigPath())
-	fmt.Println()
-	fmt.Println()
-
-	v2rayBin, _ := GetV2rayBinPath()
-	var err error
-	if useNewV2rayVersion() {
-		err = command.RunSync(v2rayBin, "run", "-c", conf.GetV2rayConfigPath())
-	} else {
-		err = command.RunSync(v2rayBin, "-config", conf.GetV2rayConfigPath())
-	}
-
-	if err != nil {
-		log.E("start v2ray error...")
-		log.E(err.Error())
-		os.Exit(-1)
-	}
-}
-
 func readPacConfigFile() {
-	//pacText := defaultPacText
 	pacFile := file.OpenFile(pacFilePath)
 	if pacFile.Exits() {
 		read, err := pacFile.Read()
@@ -109,8 +158,7 @@ func readPacConfigFile() {
 			defaultPacText = string(read)
 		}
 	} else {
-		log.E("read pac config error, pacFile in '" + pacFilePath + "' not exits" +
-			", use default pac config")
+		log.E("read pac config error, pacFile in '" + pacFilePath + "' not exits, use default pac config")
 	}
 }
 
@@ -118,7 +166,6 @@ func startPacServerOnly() {
 	http.HandleFunc("/v2sub.pac", func(w http.ResponseWriter, r *http.Request) {
 		http.ServeFile(w, r, pacFilePath)
 	})
-
 	s := &http.Server{
 		Addr:           ":23333",
 		ReadTimeout:    10 * time.Second,
@@ -129,49 +176,33 @@ func startPacServerOnly() {
 }
 
 func KillV2Sub() {
-	grep := exec.Command("grep", "v2") // 根据v2关键字进行模糊查询进程
+	grep := exec.Command("grep", "v2")
 	ps := exec.Command("ps", "cax")
-
-	// Get ps's stdout and attach it to grep's stdin.
 	pipe, _ := ps.StdoutPipe()
 	defer pipe.Close()
-
 	grep.Stdin = pipe
-
-	// Run ps first.
 	ps.Start()
-
-	// Run and get the output of grep.
 	res, _ := grep.Output()
-	resL := string(res)
-
-	processListStr := strings.Split(resL, "\n")
-	for _, pc := range processListStr {
-		elemList := strings.Split(pc, " ")
-
-		pid := elemList[0]
-		pName := elemList[len(elemList)-1]
-		if pName != "v2ray" && pName != "v2sub" {
+	for _, line := range strings.Split(string(res), "\n") {
+		elem := strings.Split(line, " ")
+		if len(elem) < 2 {
 			continue
 		}
-
-		_ = command.RunSync("kill", fmt.Sprint(pid))
+		pid := elem[0]
+		name := elem[len(elem)-1]
+		if name == "v2ray" || name == "v2sub" {
+			_ = command.RunSync("kill", pid)
+		}
 	}
 }
 
-// useNewV2rayVersion
-// v2ray 有新旧两个版本
-// 新版本的命令改了(但我不知道是从哪个版本开始改的)
-// 旧版本可以使用 v2ray -version / v2ray -config xxxxxx.json
-// 新版本只能使用 v2ray version / v2ray run -c xxxxx.json
 func useNewV2rayVersion() bool {
 	v2rayBin, _ := GetV2rayBinPath()
 	result, err := command.RunResult(v2rayBin + " -version")
 	if err != nil {
 		log.I("check new v2ray version, 'v2ray -version' get error msg, use new v2ray version cmd")
 		return true
-	} else {
-		log.I("check new v2ray version, 'v2ray -version' get result, ", result)
-		return false
 	}
+	log.I("check new v2ray version, 'v2ray -version' get result, ", result)
+	return false
 }

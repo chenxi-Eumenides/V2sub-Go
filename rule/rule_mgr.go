@@ -7,135 +7,158 @@ import (
 	"os"
 	"strings"
 
-	"github.com/Ericwyn/v2sub/ajax"
 	"github.com/Ericwyn/v2sub/conf"
 	"github.com/Ericwyn/v2sub/utils/log"
-	"github.com/Ericwyn/v2sub/utils/param"
 	"github.com/Ericwyn/v2sub/utils/storage"
 )
 
 const (
-	geoSiteURL  = "https://raw.githubusercontent.com/Loyalsoldier/v2ray-rules-dat/release/geosite.dat"
-	geoSiteFile = "geosite.dat"
+	geoSiteURL = "https://raw.githubusercontent.com/Loyalsoldier/v2ray-rules-dat/release/geosite.dat"
+	geoipURL   = "https://raw.githubusercontent.com/Loyalsoldier/v2ray-rules-dat/release/geoip.dat"
 )
 
 func ParseArgs(args []string) {
-	param.AssistParamLength(args, 1)
-
-	conf.LoadLocalConfig()
-
+	if len(args) < 1 {
+		return
+	}
 	switch args[0] {
 	case "update", "u":
-		UpdateGeoSite()
+		updateGeoSite()
 	case "proxy":
-		HandleProxy(args[1:])
+		handleRule("proxy", args[1:])
 	case "direct":
-		HandleDirect(args[1:])
+		handleRule("direct", args[1:])
 	case "list", "l":
-		ListRules()
+		listRules()
 	default:
-		log.E("rule args error, use -h to get help")
+		log.E("rule 参数错误, 使用 -rule 查看帮助")
 	}
 }
 
-func HandleProxy(args []string) {
+func updateGeoSite() {
+	log.I("开始下载 geo 数据...")
+	ok1 := downloadFile("geosite.dat", geoSiteURL)
+	ok2 := downloadFile("geoip.dat", geoipURL)
+
+	if conf.GlobalConf.CopyDatToOfficial && (ok1 || ok2) {
+		fmt.Println("正在复制到官方位置 ...")
+		failed := make([]string, 0)
+		if ok1 && !copyToOfficial("geosite.dat") {
+			failed = append(failed, "geosite.dat")
+		}
+		if ok2 && !copyToOfficial("geoip.dat") {
+			failed = append(failed, "geoip.dat")
+		}
+		if len(failed) > 0 {
+			fmt.Println("可手动复制:")
+			for _, name := range failed {
+				src := storage.GetConfigDirPath() + "/" + name
+				dest := "/usr/local/bin/" + name
+				fmt.Println("  sudo cp " + src + " " + dest)
+			}
+			fmt.Println("或设置 V2RAY_LOCATION_ASSET 环境变量指定 V2Ray 读取 dat 文件的目录")
+		}
+	}
+}
+
+func downloadFile(name, url string) bool {
+	dest := storage.GetConfigDirPath() + "/" + name
+	log.I("正在下载:", url)
+
+	resp, err := http.Get(url)
+	if err != nil {
+		fmt.Println("下载 " + name + " 失败: " + err.Error())
+		fmt.Println("可手动执行: wget -O", dest, url)
+		return false
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != 200 {
+		fmt.Printf("下载 %s 失败: HTTP %d\n", name, resp.StatusCode)
+		return false
+	}
+
+	data, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		fmt.Println("读取 " + name + " 响应失败: " + err.Error())
+		return false
+	}
+
+	if err := ioutil.WriteFile(dest, data, 0644); err != nil {
+		fmt.Println("写入 " + name + " 失败: " + err.Error())
+		fmt.Println("解决方法: sudo chown $USER:$USER " + storage.GetConfigDirPath())
+		return false
+	}
+
+	fmt.Println("  ✓ " + name + " 下载完成")
+	return true
+}
+
+func copyToOfficial(name string) bool {
+	officialDir := "/usr/local/bin"
+	if env := os.Getenv("V2RAY_LOCATION_ASSET"); env != "" {
+		officialDir = env
+	}
+	src := storage.GetConfigDirPath() + "/" + name
+	dest := officialDir + "/" + name
+	data, err := ioutil.ReadFile(src)
+	if err != nil {
+		fmt.Println("读取 " + src + " 失败: " + err.Error())
+		return false
+	}
+	if err := ioutil.WriteFile(dest, data, 0644); err != nil {
+		fmt.Println("复制 " + name + " 失败: " + err.Error())
+		return false
+	}
+	fmt.Println("  ✓ " + name + " 已复制到 " + dest)
+	return true
+}
+
+func handleRule(ruleType string, args []string) {
 	if len(args) < 1 {
-		ListProxyRules()
+		listRuleType(ruleType)
 		return
 	}
 	switch args[0] {
 	case "add", "a":
-		param.AssistParamLength(args, 2)
-		AddDomain("proxy", args[1])
+		if len(args) < 2 {
+			fmt.Println("用法: -rule", ruleType, "add {域名}")
+			return
+		}
+		addDomain(ruleType, args[1])
 	case "remove", "r":
-		param.AssistParamLength(args, 2)
-		RemoveDomain("proxy", args[1])
+		if len(args) < 2 {
+			fmt.Println("用法: -rule", ruleType, "remove {域名}")
+			return
+		}
+		removeDomain(ruleType, args[1])
 	default:
-		log.E("unknown proxy sub command: ", args[0])
+		log.E("未知命令:", args[0])
 	}
 }
 
-func HandleDirect(args []string) {
-	if len(args) < 1 {
-		ListDirectRules()
-		return
-	}
-	switch args[0] {
-	case "add", "a":
-		param.AssistParamLength(args, 2)
-		AddDomain("direct", args[1])
-	case "remove", "r":
-		param.AssistParamLength(args, 2)
-		RemoveDomain("direct", args[1])
-	default:
-		log.E("unknown direct sub command: ", args[0])
-	}
-}
-
-func UpdateGeoSite() {
-	log.I("start download geosite data from Loyalsoldier/v2ray-rules-dat...")
-
-	ajax.Send(ajax.Request{
-		Url:    geoSiteURL,
-		Method: ajax.GET,
-		Success: func(response *ajax.Response) {
-			storageDir := storage.GetConfigDirPath()
-			if err := os.MkdirAll(storageDir, 0755); err != nil {
-				log.E("create config dir failed: ", err.Error())
-				return
-			}
-			err := ioutil.WriteFile(storageDir+"/"+geoSiteFile, []byte(response.Body), 0644)
-			if err != nil {
-				log.E("save geosite.dat failed: ", err.Error())
-				return
-			}
-			log.I("geosite.dat updated successfully")
-			log.I("saved to: ", storageDir+"/"+geoSiteFile)
-		},
-		Fail: func(status int, errMsg string) {
-			log.E("download geosite.dat failed, status: ", status)
-		},
-	})
-}
-
-func AddDomain(ruleType string, domain string) {
+func addDomain(ruleType, domain string) {
 	domain = normalizeDomain(domain)
 	if domain == "" {
-		log.E("domain cannot be empty")
 		return
 	}
-
-	var list *[]string
-	if ruleType == "proxy" {
-		list = &conf.RuleConfigNow.Proxy
-	} else {
-		list = &conf.RuleConfigNow.Direct
-	}
-
+	list := getRuleList(ruleType)
 	for _, d := range *list {
 		if d == domain {
-			log.I("domain '", domain, "' already exists in ", ruleType, " rules")
+			fmt.Println("域名已存在:", domain)
 			return
 		}
 	}
-
 	*list = append(*list, domain)
-	conf.FlushRuleConfig()
-	log.I("added '", domain, "' to ", ruleType, " rules")
+	conf.SaveConfig()
+	fmt.Println("已添加:", domain)
 }
 
-func RemoveDomain(ruleType string, domain string) {
+func removeDomain(ruleType, domain string) {
 	domain = normalizeDomain(domain)
-
-	var list *[]string
-	if ruleType == "proxy" {
-		list = &conf.RuleConfigNow.Proxy
-	} else {
-		list = &conf.RuleConfigNow.Direct
-	}
-
+	list := getRuleList(ruleType)
+	newList := make([]string, 0)
 	found := false
-	newList := make([]string, 0, len(*list))
 	for _, d := range *list {
 		if d == domain {
 			found = true
@@ -143,15 +166,43 @@ func RemoveDomain(ruleType string, domain string) {
 			newList = append(newList, d)
 		}
 	}
-
 	if !found {
-		log.I("domain '", domain, "' not found in ", ruleType, " rules")
+		fmt.Println("域名不存在:", domain)
 		return
 	}
-
 	*list = newList
-	conf.FlushRuleConfig()
-	log.I("removed '", domain, "' from ", ruleType, " rules")
+	conf.SaveConfig()
+	fmt.Println("已移除:", domain)
+}
+
+func getRuleList(ruleType string) *[]string {
+	if ruleType == "proxy" {
+		return &conf.GlobalRule.Proxy
+	}
+	return &conf.GlobalRule.Direct
+}
+
+func listRules() {
+	listRuleType("proxy")
+	listRuleType("direct")
+}
+
+func listRuleType(ruleType string) {
+	list := getRuleList(ruleType)
+	fmt.Println("=======================================================")
+	if ruleType == "proxy" {
+		fmt.Println("Proxy 规则:")
+	} else {
+		fmt.Println("Direct 规则:")
+	}
+	if len(*list) == 0 {
+		fmt.Println("  (空)")
+	} else {
+		for i, d := range *list {
+			fmt.Printf("  [%d] %s\n", i+1, d)
+		}
+	}
+	fmt.Println("=======================================================")
 }
 
 func normalizeDomain(domain string) string {
@@ -159,79 +210,17 @@ func normalizeDomain(domain string) string {
 	if domain == "" {
 		return ""
 	}
-
-	// 去除协议前缀 http:// 或 https://
 	if strings.HasPrefix(domain, "http://") {
 		domain = domain[7:]
 	} else if strings.HasPrefix(domain, "https://") {
 		domain = domain[8:]
 	}
-
-	// 去除路径部分，只保留域名
 	if idx := strings.Index(domain, "/"); idx != -1 {
 		domain = domain[:idx]
 	}
-
-	// 去除开头的 www.
-	if strings.HasPrefix(domain, "www.") {
-		domain = domain[4:]
-	}
-
-	// 如果已经有 domain:、regexp:、keyword:、geosite: 等前缀，不再添加
+	domain = strings.TrimPrefix(domain, "www.")
 	if strings.Contains(domain, ":") {
 		return domain
 	}
-
-	// 添加 domain: 前缀
 	return "domain:" + domain
-}
-
-func ListProxyRules() {
-	fmt.Println("=======================================================")
-	fmt.Println("Proxy rules:")
-	if len(conf.RuleConfigNow.Proxy) == 0 {
-		fmt.Println("  (empty)")
-	} else {
-		for i, domain := range conf.RuleConfigNow.Proxy {
-			fmt.Printf("  [%d] %s\n", i+1, domain)
-		}
-	}
-	fmt.Println("=======================================================")
-}
-
-func ListDirectRules() {
-	fmt.Println("=======================================================")
-	fmt.Println("Direct rules:")
-	if len(conf.RuleConfigNow.Direct) == 0 {
-		fmt.Println("  (empty)")
-	} else {
-		for i, domain := range conf.RuleConfigNow.Direct {
-			fmt.Printf("  [%d] %s\n", i+1, domain)
-		}
-	}
-	fmt.Println("=======================================================")
-}
-
-func ListRules() {
-	ListProxyRules()
-	ListDirectRules()
-}
-
-func FetchFromURL(url string) (string, error) {
-	resp, err := http.Get(url)
-	if err != nil {
-		return "", err
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != 200 {
-		return "", fmt.Errorf("http status: %d", resp.StatusCode)
-	}
-
-	body, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		return "", err
-	}
-
-	return string(body), nil
 }

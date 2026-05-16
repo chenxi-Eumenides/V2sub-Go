@@ -1,98 +1,81 @@
 package conf
 
 import (
-	"github.com/Ericwyn/v2sub/utils/log"
-	"github.com/Ericwyn/v2sub/utils/param"
+	"fmt"
 	"strconv"
 	"strings"
 )
 
 func ParseArgs(args []string) {
-	param.AssistParamLength(args, 1)
+	if len(args) < 1 {
+		return
+	}
 	switch args[0] {
-	case "sport": // -conf sport 1080 设置 socks 代理端口
-		param.AssistParamLength(args, 2)
-		setSocksPort(args[1])
-		break
-	case "hport": // -conf sport 1081 设置 hport 代理端口
-		param.AssistParamLength(args, 2)
-		setHttpPort(args[1])
-		break
-	case "lconn": // -conf lconn true 允许来自局域网的连接
-		param.AssistParamLength(args, 2)
-		setLocalConnEnable(args[1])
-		break
-	case "bypasslan": // -conf bypasslan true 绕过局域网
-		param.AssistParamLength(args, 2)
-		setBypassLan(args[1])
-		break
-	case "list": // -conf list 允许来自局域网的连接
-		param.AssistParamLength(args, 1)
-		log.I("Config SocksPort:       ", ServerConfigNow.SocksPort)
-		log.I("Config HttpPort:        ", ServerConfigNow.HttpPort)
-		log.I("Config AllLocalConnect: ", ServerConfigNow.AllowLocalConnect)
-		log.I("Config BypassLan:       ", ServerConfigNow.BypassLan)
-
-		break
+	case "sport":
+		if len(args) < 2 {
+			fmt.Println("用法: -conf sport {端口号}")
+			return
+		}
+		setInt(args[1], &GlobalConf.SocksPort, "SOCKS 端口")
+	case "hport":
+		if len(args) < 2 {
+			fmt.Println("用法: -conf hport {端口号}")
+			return
+		}
+		setInt(args[1], &GlobalConf.HttpPort, "HTTP 端口")
+	case "lconn":
+		if len(args) < 2 {
+			fmt.Println("用法: -conf lconn {true|false}")
+			return
+		}
+		setBool(args[1], &GlobalConf.AllowLocalConnect, "允许局域网连接")
+	case "bypasslan":
+		if len(args) < 2 {
+			fmt.Println("用法: -conf bypasslan {true|false}")
+			return
+		}
+		setBool(args[1], &GlobalConf.BypassLan, "绕过局域网直连")
+	case "copydat":
+		if len(args) < 2 {
+			fmt.Println("用法: -conf copydat {true|false}")
+			return
+		}
+		setBool(args[1], &GlobalConf.CopyDatToOfficial, "复制 geosite.dat 到官方位置")
+	case "list":
+		fmt.Println("SOCKS 端口:", GlobalConf.SocksPort)
+		fmt.Println("HTTP 端口:", GlobalConf.HttpPort)
+		fmt.Println("允许局域网连接:", GlobalConf.AllowLocalConnect)
+		fmt.Println("绕过局域网直连:", GlobalConf.BypassLan)
+		fmt.Println("复制 geosite.dat 到官方位置:", GlobalConf.CopyDatToOfficial)
 	default:
-		log.E("sub args error")
+		fmt.Println("未知命令:", args[0])
 	}
 }
 
-func setSocksPort(port string) {
-	portNum, err := strconv.Atoi(port)
-	if err != nil || portNum <= 0 || portNum >= 65534 {
-		log.E("socks port error, port : " + port)
+func setInt(val string, target *int, name string) {
+	n, err := strconv.Atoi(val)
+	if err != nil || n <= 0 || n >= 65534 {
+		fmt.Println(name, "设置失败, 无效值:", val)
 		return
 	}
-
-	log.I("set SocksPort to : ", portNum)
-	ServerConfigNow.SocksPort = portNum
-	FlushConfig()
+	*target = n
+	fmt.Println("设置", name, "为:", n)
+	SaveConfig()
 }
 
-func setHttpPort(port string) {
-	portNum, err := strconv.Atoi(port)
-	if err != nil || portNum <= 0 || portNum >= 65534 {
-		log.E("http port error, port : " + port)
+func setBool(val string, target *bool, name string) {
+	val = strings.ToLower(val)
+	var b bool
+	switch val {
+	case "true", "t", "1":
+		b = true
+	case "false", "f", "0":
+		b = false
+	default:
+		fmt.Println(name, "设置失败, 请输入 true 或 false")
 		return
 	}
-
-	log.I("set HttpPort to : ", portNum)
-	ServerConfigNow.HttpPort = portNum
-	FlushConfig()
-}
-
-func setLocalConnEnable(enableFlag string) {
-	enableFlag = strings.ToLower(enableFlag)
-	enable := false
-	if enableFlag == "t" || enableFlag == "true" || enableFlag == "1" {
-		enable = true
-	} else if enableFlag == "f" || enableFlag == "false" || enableFlag == "0" {
-		enable = false
-	} else {
-		log.E("enable flag error, plase input true|false, flag now : " + enableFlag)
-		return
-	}
-
-	log.I("set AllowLocalConnect to : ", enable)
-	ServerConfigNow.AllowLocalConnect = enable
-	FlushConfig()
-}
-
-func setBypassLan(enableFlag string) {
-	enableFlag = strings.ToLower(enableFlag)
-	enable := false
-	if enableFlag == "t" || enableFlag == "true" || enableFlag == "1" {
-		enable = true
-	} else if enableFlag == "f" || enableFlag == "false" || enableFlag == "0" {
-		enable = false
-	} else {
-		log.E("bypasslan flag error, plase input true|false, flag now : " + enableFlag)
-		return
-	}
-
-	log.I("set BypassLan to : ", enable)
-	ServerConfigNow.BypassLan = enable
-	FlushConfig()
+	*target = b
+	fmt.Println("设置", name, "为:", b)
+	SaveConfig()
 }

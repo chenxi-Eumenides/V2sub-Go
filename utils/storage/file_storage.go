@@ -1,6 +1,7 @@
 package storage
 
 import (
+	"fmt"
 	"os"
 
 	"github.com/Ericwyn/GoTools/file"
@@ -47,6 +48,7 @@ func ReadConfigFileLocal(fileName string) []byte {
 }
 
 var moduleFileName string = "config_module.json"
+var v2subConfigName string = "v2sub.json"
 
 func LoadV2ConfigModule() string {
 	_ = os.MkdirAll(configDirPath, 0755)
@@ -54,20 +56,25 @@ func LoadV2ConfigModule() string {
 	configFile := file.OpenFile(dir.AbsPath() + "/" + moduleFileName)
 	read, err := configFile.Read()
 	if err == nil && string(read) != "" {
-		//log.E("read config file: " + configFile.AbsPath() +" error")
-		log.I("get module from config_module.json")
 		return string(read)
 	} else {
-		// 创建 module
-		log.I("get module from default module")
 		createV2ConfigModule()
-		log.I("flush default config module to " + configDirPath + "/" + moduleFileName)
+		fmt.Println("已创建默认模板:", configDirPath+"/"+moduleFileName)
 		return module
 	}
 }
 
 func GetConfigDirPath() string {
 	return configDirPath
+}
+
+func SaveV2SubConfig(data string) {
+	WriteConfigFileLocal(data, v2subConfigName)
+}
+
+func LoadV2SubConfig() string {
+	raw := ReadConfigFileLocal(v2subConfigName)
+	return string(raw)
 }
 
 func createV2ConfigModule() {
@@ -264,8 +271,7 @@ var module = `{
           "{customDirectDomains}"
         ],
         "outboundTag": "direct"
-      },
-      {bypassLanRule}
+      }{bypassLanRule}
     ]
   }
 }

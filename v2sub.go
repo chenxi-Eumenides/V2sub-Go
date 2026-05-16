@@ -2,134 +2,172 @@ package main
 
 import (
 	"fmt"
+	"os"
+
 	"github.com/Ericwyn/v2sub/conf"
 	"github.com/Ericwyn/v2sub/conn"
 	"github.com/Ericwyn/v2sub/rule"
 	"github.com/Ericwyn/v2sub/server"
 	"github.com/Ericwyn/v2sub/sub"
 	"github.com/Ericwyn/v2sub/utils/log"
-	"os"
 )
 
-const versionMsg = "Release 1.0.4, 2024.02.29"
+const versionMsg = "Release 1.2.0"
 
 func main() {
-
-	bootArgs := os.Args
-
 	if len(os.Args) < 2 {
-		// 输出 help
 		printArgsHelp()
 		os.Exit(0)
 	}
 
-	// -init 初始化命令，在 LoadLocalConfig 之前运行
-	if bootArgs[1] == "-init" {
-		runInit()
+	// -v/--version、-h/--help 不检查环境
+	switch os.Args[1] {
+	case "-v", "--version", "--v":
+		fmt.Println("v2sub", versionMsg)
+		fmt.Println("https://github.com/chenxi-Eumenides/V2sub-Go")
+		return
+	case "-h", "--help":
+		printArgsHelp()
 		return
 	}
 
-	conf.LoadLocalConfig()
+	conf.InitEnvironment()
 
-	// 解析 args，依据不同的 args 进行不同的业务
-	// 将运行路径参数删除掉
-	parseArg(bootArgs[1:])
+	bootArgs := os.Args[1:]
+	parseArg(bootArgs)
 }
 
 func parseArg(args []string) {
 	switch args[0] {
-	case "-h", "--help":
-		printArgsHelp()
-		os.Exit(0)
-	case "-v", "--version", "--v":
-		fmt.Println("v2sub", versionMsg)
-		fmt.Println("https://github.com/Ericwyn/v2sub")
 	case "-sub":
+		if len(args) < 2 {
+			printSubHelp()
+			return
+		}
 		sub.ParseArgs(args[1:])
-	case "-conf": // 设置端口/局域网连接
-		conf.ParseArgs(args[1:])
 	case "-ser":
+		if len(args) < 2 {
+			printSerHelp()
+			return
+		}
 		server.ParseArgs(args[1:])
-	case "-conn":
-		conn.ParseArgs(args[1:])
 	case "-rule":
+		if len(args) < 2 {
+			printRuleHelp()
+			return
+		}
 		rule.ParseArgs(args[1:])
+	case "-conf":
+		if len(args) < 2 {
+			printConfHelp()
+			return
+		}
+		conf.ParseArgs(args[1:])
+	case "-conn":
+		if len(args) < 2 {
+			printConnHelp()
+			return
+		}
+		conn.ParseArgs(args[1:])
 	default:
-		log.E("param error, use -h can get the params help")
+		log.E("参数错误，使用 -h 查看帮助")
 		os.Exit(-1)
 	}
 }
 
 func printArgsHelp() {
-	fmt.Println(
-		`订阅管理:
-    -sub add {name} {url} 
-        添加一个订阅，订阅节点自动增加到 ser list
-    -sub update {name} 
-        更新一个订阅
-    -sub update all 
-        更新全部订阅结果
-    -sub remove {name} 
-        删除一个订阅
-    -sub list 
-        查看当前所有订阅
+	fmt.Println(`v2sub - Linux V2Ray 订阅管理工具
+版本 ` + versionMsg + `
 
-节点查看:
-    -ser list 
-        查看所有节点
-    -ser set {ser_id} 
-        设置默认节点
-    -ser setx 
-        对节点进行 ping 测速，之后将默认节点设置为最快节点
-    -ser setflush
-        将当前选择的节点输出到 /etc/v2sub/config.json
-    -ser speedtest
-        使用 tcping 查看各个节点的连接速度
-    
-连接配置管理
-    -conf sport {socket_port} 
-        socket 端口号管理, 默认 1080
-    -conf hport {http_port} 
-        http 端口号管理， 默认1081
-    -conf lconn {true|false} 
-        是否允许来自局域网的连接，默认为 false
-    -conf bypasslan {true|false}
-        绕过局域网（直连），不经过代理，默认为 false
-    -conf list
-        展示当前的 port、lconn、bypasslan 配置
-  
-连接
-    -conn start 
-        启用 v2ray 连接 server
-    -conn start-pac
-        启用 v2ray 连接 server，并同时在 :23333/v2sub.pac 返回 /etc/v2sub/v2sub.pac 文件
-    -conn kill 
-        停止 v2ray （kill 掉其他 v2sub 和 v2ray）
+用法: v2sub <命令> [子命令] [参数]
 
-规则管理
-    -rule update
-        从 Loyalsoldier/v2ray-rules-dat 下载最新的 geosite.dat
-    -rule proxy
-        查看当前自定义 proxy 域名规则
-    -rule proxy add {domain}
-        添加域名到 proxy 规则（走代理）
-    -rule proxy remove {domain}
-        从 proxy 规则中移除域名
-    -rule direct
-        查看当前自定义 direct 域名规则
-    -rule direct add {domain}
-        添加域名到 direct 规则（直连）
-    -rule direct remove {domain}
-        从 direct 规则中移除域名
-    -rule list
-        查看所有自定义域名规则
+  订阅管理 (-sub):
+    -sub add {name} {url}         添加订阅
+    -sub update {name}            更新订阅
+    -sub update all               更新全部订阅
+    -sub remove {name}            删除订阅
+    -sub list                     查看订阅列表
 
- 其他
-    -v, --version
-        查看版本号
-    -h, --help
-        查看帮助说明
-    -init
-        初始化 v2sub 运行环境（创建目录、检测 v2ray、写入默认配置、下载 geosite.dat）
-`)
+  节点管理 (-ser):
+    -ser list                     查看所有节点
+    -ser set {id}                 设置默认节点
+    -ser setx                     测速并设置最快节点
+    -ser speedtest                测试节点连接速度
+
+  规则管理 (-rule):
+    -rule update                  下载 geosite.dat
+    -rule proxy                   查看 Proxy 规则
+    -rule proxy add {domain}      添加域名到 Proxy
+    -rule proxy remove {domain}   从 Proxy 移除域名
+    -rule direct                  查看 Direct 规则
+    -rule direct add {domain}     添加域名到 Direct
+    -rule direct remove {domain}  从 Direct 移除域名
+    -rule list                    查看所有规则
+
+  连接配置 (-conf):
+    -conf list                    查看当前配置
+    -conf sport {port}            设置 SOCKS 端口 (默认 1080)
+    -conf hport {port}            设置 HTTP 端口 (默认 1081)
+    -conf lconn {true|false}      允许局域网连接
+    -conf bypasslan {true|false}  绕过局域网直连
+    -conf copydat {true|false}    下载 geosite.dat 后复制到 V2Ray 默认位置
+
+  连接 (-conn):
+    -conn start                   启动 V2Ray
+    -conn start-pac               启动 V2Ray + PAC 服务
+    -conn kill                    停止 V2Ray
+
+  -v, --version                   查看版本号
+  -h, --help                      查看帮助`)
+}
+
+func printSubHelp() {
+	fmt.Println(`用法: v2sub -sub <命令> [参数]
+
+  add {name} {url}      添加订阅
+  update {name}         更新指定订阅
+  update all            更新全部订阅
+  remove {name}         删除指定订阅
+  list                  查看所有订阅`)
+}
+
+func printSerHelp() {
+	fmt.Println(`用法: v2sub -ser <命令> [参数]
+
+  list                  查看所有节点
+  set {id}              设置默认节点
+  setx                  测速并设置最快节点
+  speedtest             测试所有节点连接速度`)
+}
+
+func printRuleHelp() {
+	fmt.Println(`用法: v2sub -rule <命令> [参数]
+
+  update                下载 geosite.dat
+  proxy                 查看 Proxy 规则
+  proxy add {domain}    添加域名到 Proxy
+  proxy remove {domain} 从 Proxy 移除域名
+  direct                查看 Direct 规则
+  direct add {domain}   添加域名到 Direct
+  direct remove {domain}从 Direct 移除域名
+  list                  查看所有规则`)
+}
+
+func printConfHelp() {
+	fmt.Println(`用法: v2sub -conf <命令> [参数]
+
+  list                  查看当前配置
+  sport {port}          设置 SOCKS 端口 (默认 1080)
+  hport {port}          设置 HTTP 端口 (默认 1081)
+  lconn {true|false}    允许局域网连接
+  bypasslan {true|false}绕过局域网直连
+  copydat {true|false}  下载 geosite.dat 后复制到 V2Ray 默认位置`)
+}
+
+func printConnHelp() {
+	fmt.Println(`用法: v2sub -conn <命令> [参数]
+
+  start                 启动 V2Ray 连接
+  start-pac             启动 V2Ray + PAC 服务
+  kill                  停止 V2Ray`)
 }
