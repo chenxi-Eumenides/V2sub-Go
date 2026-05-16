@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
+	"os"
 	"strings"
 
 	"github.com/Ericwyn/v2sub/ajax"
@@ -79,6 +80,10 @@ func UpdateGeoSite() {
 		Method: ajax.GET,
 		Success: func(response *ajax.Response) {
 			storageDir := storage.GetConfigDirPath()
+			if err := os.MkdirAll(storageDir, 0755); err != nil {
+				log.E("create config dir failed: ", err.Error())
+				return
+			}
 			err := ioutil.WriteFile(storageDir+"/"+geoSiteFile, []byte(response.Body), 0644)
 			if err != nil {
 				log.E("save geosite.dat failed: ", err.Error())

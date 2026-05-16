@@ -2,6 +2,9 @@ package conf
 
 import (
 	"encoding/json"
+	"fmt"
+	"os"
+
 	"github.com/Ericwyn/v2sub/utils/log"
 	"github.com/Ericwyn/v2sub/utils/storage"
 )
@@ -19,6 +22,22 @@ var ruleConfigName = "rules.json"
 // 从本地读取配置文件
 func LoadLocalConfig() {
 	if !initFlag {
+		if err := storage.InitConfigDir(); err != nil {
+			fmt.Println("=======================================================")
+			fmt.Println("错误: 无法访问配置目录 /etc/v2sub/")
+			fmt.Println("")
+			fmt.Println("v2sub 需要在 " + storage.GetConfigDirPath() + " 目录读写配置文件。")
+			fmt.Println("当前用户没有该目录的写入权限。")
+			fmt.Println("")
+			fmt.Println("解决方法: 使用 sudo 运行")
+			fmt.Println("  sudo v2sub [参数]")
+			fmt.Println("")
+			fmt.Println("也可以手动创建目录并更改所有者为当前用户:")
+			fmt.Println("  sudo mkdir -p " + storage.GetConfigDirPath())
+			fmt.Println("  sudo chown $USER:$USER " + storage.GetConfigDirPath())
+			fmt.Println("=======================================================")
+			os.Exit(1)
+		}
 		subConfigBytes := storage.ReadConfigFileLocal(subConfigName)
 		if string(subConfigBytes) != "" {
 			err := json.Unmarshal(subConfigBytes, &SubConfigNow)

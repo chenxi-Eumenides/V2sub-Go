@@ -221,15 +221,12 @@ func checkSub(sub conf.VSub) []conf.VServer {
 			servers, err := parseSubMsg(response.Body, sub.SubName)
 			if err != nil {
 				log.E("parse sub msg error, subMsg: " + response.Body)
-				panic(err)
 			} else {
 				res = servers
 			}
 		},
 		Fail: func(status int, errMsg string) {
-			err := errors.New(errMsg)
-			log.E("get server msgs from sub url fail")
-			panic(err)
+			log.E("get server msgs from sub url fail, status: ", status, ", msg: ", errMsg)
 		},
 		Always: nil,
 	})
