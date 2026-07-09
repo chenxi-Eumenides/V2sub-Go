@@ -159,7 +159,3 @@ func Send(reqData Request) {
 	}
 
 }
-
-func Get(data Request) {
-
-}

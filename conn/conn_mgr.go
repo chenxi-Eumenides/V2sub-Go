@@ -48,6 +48,19 @@ func startV2ray() {
 	log.I("start v2ray ......")
 	checkV2ray()
 
+	// Guard: check if there are any nodes
+	if len(conf.GlobalSer.Sub) == 0 {
+		log.E("没有可用节点，请先使用 -sub add 添加订阅")
+		os.Exit(-1)
+	}
+	// Guard: check if Current.Index is valid
+	if conf.GlobalSer.Current.Index >= len(conf.GlobalSer.Sub) {
+		log.E("当前节点索引无效 (", conf.GlobalSer.Current.Index, ">=", len(conf.GlobalSer.Sub), ")，已重置为 0")
+		conf.GlobalSer.Current.Index = 0
+		conf.GlobalSer.Current.SubName = conf.GlobalSer.Sub[0].SubName
+		conf.SaveConfig()
+	}
+
 	runConfig := conf.GlobalSer.Sub[conf.GlobalSer.Current.Index]
 
 	generateConfig(runConfig)
@@ -56,9 +69,9 @@ func startV2ray() {
 	log.I("========================================================================")
 	log.I(putil.F("ID", 4), putil.F("别名", 50), putil.F("地址", 24), putil.F("端口", 10), putil.F("类型", 5))
 	log.I(putil.F(" ["+strconv.Itoa(conf.GlobalSer.Current.Index)+"]", 4),
-		putil.F(runConfig.Vmess.Ps, 50),
+		putil.F(runConfig.Vmess.GetPs(), 50),
 		putil.F(runConfig.Vmess.Addr, 24),
-		putil.F(runConfig.Vmess.Port, 10),
+		putil.F(runConfig.Vmess.GetPort(), 10),
 		putil.F(runConfig.Vmess.Type, 5))
 	log.I("========================================================================")
 
@@ -85,7 +98,7 @@ func generateConfig(entry conf.SerSubEntry) {
 	module := storage.LoadV2ConfigModule()
 
 	module = strings.Replace(module, "{Add}", entry.Vmess.Addr, 1)
-	module = strings.Replace(module, "{Port}", entry.Vmess.Port, 1)
+	module = strings.Replace(module, "{Port}", entry.Vmess.GetPort(), 1)
 	module = strings.Replace(module, "{ID}", entry.Vmess.ID, 1)
 	module = strings.Replace(module, "{Aid}", strconv.Itoa(entry.Vmess.Aid), 1)
 	module = strings.Replace(module, "{Net}", entry.Vmess.Net, 1)

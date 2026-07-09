@@ -2,12 +2,10 @@ package sub
 
 import (
 	"fmt"
-	"strings"
 
 	"github.com/Ericwyn/v2sub/ajax"
 	"github.com/Ericwyn/v2sub/conf"
-	"github.com/Ericwyn/v2sub/server"
-	"github.com/Ericwyn/v2sub/utils/decode"
+	"github.com/Ericwyn/v2sub/sub/parser"
 	"github.com/Ericwyn/v2sub/utils/log"
 	"github.com/Ericwyn/v2sub/utils/putil"
 )
@@ -65,8 +63,9 @@ func addSub(name, url string) {
 		Url:    url,
 		Method: ajax.GET,
 		Success: func(resp *ajax.Response) {
-			entries := parseSubResult(resp.Body, name)
+			entries := parser.Parse(resp.Body, name)
 			if len(entries) == 0 {
+				fmt.Println("订阅解析失败: 无法识别的订阅格式")
 				return
 			}
 			conf.GlobalSer.Sub = append(conf.GlobalSer.Sub, entries...)
@@ -112,27 +111,4 @@ func listSubs() {
 		fmt.Println(putil.F(name, 10), url)
 	}
 	fmt.Println("=======================================================")
-}
-
-func parseSubResult(body, subName string) []conf.SerSubEntry {
-	decoded := decode.Base64Decode(body)
-	if decoded == "" {
-		return nil
-	}
-	entries := make([]conf.SerSubEntry, 0)
-	for _, line := range strings.Split(decoded, "\n") {
-		if !strings.HasPrefix(line, "vmess://") {
-			continue
-		}
-		vmess := server.ParseVmessLink(line)
-		if vmess == nil {
-			continue
-		}
-		entries = append(entries, conf.SerSubEntry{
-			SubName: subName,
-			Source:  line,
-			Vmess:   *vmess,
-		})
-	}
-	return entries
 }

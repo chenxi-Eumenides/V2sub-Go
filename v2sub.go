@@ -12,7 +12,7 @@ import (
 	"github.com/Ericwyn/v2sub/utils/log"
 )
 
-const versionMsg = "Release 1.2.0"
+const versionMsg = "Release 1.3.1"
 
 func main() {
 	if len(os.Args) < 2 {
@@ -45,6 +45,8 @@ func parseArg(args []string) {
 			return
 		}
 		sub.ParseArgs(args[1:])
+	case "-status":
+		server.ShowInfo()
 	case "-ser":
 		if len(args) < 2 {
 			printSerHelp()
@@ -117,8 +119,9 @@ func printArgsHelp() {
     -conn start-pac               启动 V2Ray + PAC 服务
     -conn kill                    停止 V2Ray
 
-  -v, --version                   查看版本号
-  -h, --help                      查看帮助`)
+   -status                         查看当前状态信息
+   -v, --version                   查看版本号
+   -h, --help                      查看帮助`)
 }
 
 func printSubHelp() {

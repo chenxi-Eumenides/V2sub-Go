@@ -1,6 +1,8 @@
 # v2sub
 
-linux 上面 v2ray 订阅管理工具, 支持获取 vmess 订阅
+> ⚠️ **免责声明**：本仓库是在 [原仓库](https://github.com/Ericwyn/v2sub) 的基础上由 AI 修改而来，不保证可用性和稳定性。如遇任何问题，请让 AI 检查并修复。
+
+linux 上面 v2ray 订阅管理工具, 支持获取 vmess 订阅，支持多平台订阅格式自动识别
 
 帮助自己在 linux 上面订阅 [JustMySocks](https://justmysocks.net/members/aff.php?aff=18111)
 
@@ -31,6 +33,10 @@ v2sub 是命令行工具，支持在 linux 下命令行运行，也可以交叉�
         将当前选择的节点输出到 /etc/v2sub/config.json
     -ser speedtest
         使用 tcping 查看各个节点的连接速度
+
+状态查看:
+    -status
+        查看订阅列表、节点数量、当前连接节点等状态信息
     
 连接配置管理
     -conf sport {socket_port} 
@@ -102,6 +108,23 @@ v2sub 是命令行工具，支持在 linux 下命令行运行，也可以交叉�
 # 1   JMS@xxx.jamjams.net:11111                          xxx.xxx.xxx.xxx         52623      tcp
 # 2   JMS@xxx.jamjams.net:11111                          xxx.xxx.xxx.xxx         52623      tcp
 # 3   JMS@xxx.jamjams.net:11111                          xxx.xxx.xxx.xxx         52623      tcp
+#=======================================================
+
+# 查看当前状态信息（订阅、节点数、当前连接节点等）
+./v2sub -status
+#=======================================================
+#订阅列表:
+#  JustMySocks        3 个节点
+#  ------------------------------
+#  共 1 个订阅, 3 个节点
+#
+#当前节点:
+#  ID:       [0]
+#  别名:     JMS@xxx.jamjams.net:11111
+#  地址:     xxx.xxx.xxx.xxx
+#  端口:     52623
+#  类型:     tcp
+#  所属订阅: JustMySocks
 #=======================================================
 
 # 设置默认连接节点

@@ -70,12 +70,55 @@ func listServer() {
 		}
 		fmt.Println(
 			putil.F(mark+strconv.Itoa(i)+"]", 4),
-			putil.F(entry.Vmess.Ps, 50),
+			putil.F(entry.Vmess.GetPs(), 50),
 			putil.F(entry.Vmess.Addr, 24),
-			putil.F(entry.Vmess.Port, 10),
+			putil.F(entry.Vmess.GetPort(), 10),
 			putil.F(entry.Vmess.Type, 5),
 		)
 	}
+	fmt.Println("=======================================================")
+}
+
+func ShowInfo() {
+	fmt.Println("=======================================================")
+
+	fmt.Println("订阅列表:")
+	if len(conf.GlobalSer.SubUrls) == 0 {
+		fmt.Println("  (无订阅)")
+	} else {
+		totalNodes := 0
+		for name := range conf.GlobalSer.SubUrls {
+			count := 0
+			for _, entry := range conf.GlobalSer.Sub {
+				if entry.SubName == name {
+					count++
+				}
+			}
+			totalNodes += count
+			fmt.Printf("  %-15s %3d 个节点\n", name, count)
+		}
+		fmt.Println("  ------------------------------")
+		fmt.Printf("  共 %d 个订阅, %d 个节点\n", len(conf.GlobalSer.SubUrls), totalNodes)
+	}
+	fmt.Println()
+
+	fmt.Println("当前节点:")
+	if len(conf.GlobalSer.Sub) == 0 {
+		fmt.Println("  (无可用节点)")
+	} else {
+		idx := conf.GlobalSer.Current.Index
+		if idx >= len(conf.GlobalSer.Sub) {
+			idx = 0
+		}
+		entry := conf.GlobalSer.Sub[idx]
+		fmt.Printf("  ID:       [%d]\n", idx)
+		fmt.Printf("  别名:     %s\n", entry.Vmess.GetPs())
+		fmt.Printf("  地址:     %s\n", entry.Vmess.Addr)
+		fmt.Printf("  端口:     %s\n", entry.Vmess.GetPort())
+		fmt.Printf("  类型:     %s\n", entry.Vmess.Net)
+		fmt.Printf("  所属订阅: %s\n", entry.SubName)
+	}
+
 	fmt.Println("=======================================================")
 }
 
@@ -107,9 +150,9 @@ func SpeedTestAll(setFastest bool) {
 		}
 		fmt.Println(
 			putil.F(mark+strconv.Itoa(r.Index)+"]", 4),
-			putil.F(r.Entry.Vmess.Ps, 50),
+			putil.F(r.Entry.Vmess.GetPs(), 50),
 			putil.F(r.Entry.Vmess.Addr, 24),
-			putil.F(r.Entry.Vmess.Port, 10),
+			putil.F(r.Entry.Vmess.GetPort(), 10),
 			putil.F(r.Entry.Vmess.Net, 5),
 			putil.F(fmt.Sprint(r.Speed)+" ms", 5),
 		)
@@ -121,7 +164,7 @@ func SpeedTestAll(setFastest bool) {
 		conf.GlobalSer.Current.Index = best.Index
 		conf.GlobalSer.Current.SubName = best.Entry.SubName
 		conf.SaveConfig()
-		fmt.Println("已设置最快节点为:", best.Entry.Vmess.Ps)
+		fmt.Println("已设置最快节点为:", best.Entry.Vmess.GetPs())
 	}
 }
 
