@@ -12,7 +12,7 @@ import (
 	"github.com/Ericwyn/v2sub/utils/log"
 )
 
-const versionMsg = "Release 1.3.1"
+const versionMsg = "Release 1.3.2"
 
 func main() {
 	if len(os.Args) < 2 {
