@@ -1,6 +1,11 @@
 package parser
 
-import "github.com/Ericwyn/v2sub/conf"
+import (
+	"strings"
+
+	"github.com/Ericwyn/v2sub/conf"
+	"github.com/Ericwyn/v2sub/server"
+)
 
 // SubParser parses a raw subscription response body into server entries.
 // Each implementation handles a specific subscription format.
@@ -17,10 +22,9 @@ type SubParser interface {
 // first parser that can handle the body.
 // Returns nil if no parser can handle the format.
 func Parse(body string, subName string) []conf.SerSubEntry {
-	// Register parsers here (ordered by specificity)
 	parsers := []SubParser{
-		&VmessBase64Parser{},
-		&VmessPlainParser{},
+		&Base64LinkParser{},
+		&PlainLinkParser{},
 	}
 	for _, p := range parsers {
 		if p.CanParse(body) {
@@ -28,4 +32,31 @@ func Parse(body string, subName string) []conf.SerSubEntry {
 		}
 	}
 	return nil
+}
+
+// parseLinkLine parses a single subscription link (vmess/ss/vless/trojan)
+// into a server entry. Returns nil if the line is not a supported link.
+func parseLinkLine(line string, subName string) *conf.SerSubEntry {
+	var protocol string
+	var vmess *conf.VmessJson
+	switch {
+	case strings.HasPrefix(line, "vmess://"):
+		protocol = "vmess"
+		vmess = server.ParseVmessLink(line)
+	case strings.HasPrefix(line, "vless://"):
+		protocol = "vless"
+		vmess = server.ParseVlessLink(line)
+	case strings.HasPrefix(line, "ss://"):
+		protocol = "ss"
+		vmess = server.ParseSsLink(line)
+	}
+	if vmess == nil {
+		return nil
+	}
+	return &conf.SerSubEntry{
+		SubName:  subName,
+		Source:   line,
+		Protocol: protocol,
+		Vmess:    *vmess,
+	}
 }
