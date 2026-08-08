@@ -36,9 +36,10 @@ type SerCurrent struct {
 }
 
 type SerSubEntry struct {
-	SubName string    `json:"subName"`
-	Source  string    `json:"source"`
-	Vmess   VmessJson `json:"vmess"`
+	SubName  string    `json:"subName"`
+	Source   string    `json:"source"`
+	Protocol string    `json:"protocol"` // vmess / ss / vless
+	Vmess    VmessJson `json:"vmess"`
 }
 
 type VmessJson struct {
@@ -56,6 +57,17 @@ type VmessJson struct {
 	Sni    string          `json:"sni,omitempty"`
 	Fp     string          `json:"fp,omitempty"`
 	Alpn   string          `json:"alpn,omitempty"`
+
+	// shadowsocks (ss://)
+	Method   string `json:"method,omitempty"`
+	Password string `json:"password,omitempty"`
+
+	// vless (vless://)
+	Flow     string `json:"flow,omitempty"`
+	Security string `json:"security,omitempty"` // tls / reality / none
+	Pbk      string `json:"pbk,omitempty"`      // publicKey (reality)
+	Sid      string `json:"sid,omitempty"`      // shortId (reality)
+	Spx      string `json:"spx,omitempty"`      // spiderX (reality)
 }
 
 // GetPort returns the port as a string, handling both JSON int and string formats.
@@ -77,6 +89,15 @@ func (v *VmessJson) GetPs() string {
 		return v.Ps
 	}
 	return v.Remark
+}
+
+// ProtocolName returns the node protocol, defaulting to vmess
+// for entries saved before the protocol field existed.
+func (e *SerSubEntry) ProtocolName() string {
+	if e.Protocol == "" {
+		return "vmess"
+	}
+	return e.Protocol
 }
 
 var GlobalConf ConfConfig
