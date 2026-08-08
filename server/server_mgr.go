@@ -73,7 +73,7 @@ func listServer() {
 			putil.F(entry.Vmess.GetPs(), 50),
 			putil.F(entry.Vmess.Addr, 24),
 			putil.F(entry.Vmess.GetPort(), 10),
-			putil.F(entry.Vmess.Type, 5),
+			putil.F(entry.ProtocolName(), 5),
 		)
 	}
 	fmt.Println("=======================================================")
@@ -115,7 +115,7 @@ func ShowInfo() {
 		fmt.Printf("  别名:     %s\n", entry.Vmess.GetPs())
 		fmt.Printf("  地址:     %s\n", entry.Vmess.Addr)
 		fmt.Printf("  端口:     %s\n", entry.Vmess.GetPort())
-		fmt.Printf("  类型:     %s\n", entry.Vmess.Net)
+		fmt.Printf("  类型:     %s\n", entry.ProtocolName())
 		fmt.Printf("  所属订阅: %s\n", entry.SubName)
 	}
 
@@ -153,7 +153,7 @@ func SpeedTestAll(setFastest bool) {
 			putil.F(r.Entry.Vmess.GetPs(), 50),
 			putil.F(r.Entry.Vmess.Addr, 24),
 			putil.F(r.Entry.Vmess.GetPort(), 10),
-			putil.F(r.Entry.Vmess.Net, 5),
+			putil.F(r.Entry.ProtocolName(), 5),
 			putil.F(fmt.Sprint(r.Speed)+" ms", 5),
 		)
 	}
