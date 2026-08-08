@@ -72,7 +72,7 @@ func startV2ray() {
 		putil.F(runConfig.Vmess.GetPs(), 50),
 		putil.F(runConfig.Vmess.Addr, 24),
 		putil.F(runConfig.Vmess.GetPort(), 10),
-		putil.F(runConfig.Vmess.Type, 5))
+		putil.F(runConfig.ProtocolName(), 5))
 	log.I("========================================================================")
 
 	configPath := storage.GetConfigDirPath() + "/config.json"
@@ -97,11 +97,7 @@ func startV2ray() {
 func generateConfig(entry conf.SerSubEntry) {
 	module := storage.LoadV2ConfigModule()
 
-	module = strings.Replace(module, "{Add}", entry.Vmess.Addr, 1)
-	module = strings.Replace(module, "{Port}", entry.Vmess.GetPort(), 1)
-	module = strings.Replace(module, "{ID}", entry.Vmess.ID, 1)
-	module = strings.Replace(module, "{Aid}", strconv.Itoa(entry.Vmess.Aid), 1)
-	module = strings.Replace(module, "{Net}", entry.Vmess.Net, 1)
+	module = strings.Replace(module, "{ProxyOutbound}", buildProxyOutbound(entry), 1)
 
 	module = strings.Replace(module, "{sPort}", strconv.Itoa(conf.GlobalConf.SocksPort), 1)
 	module = strings.Replace(module, "{hPort}", strconv.Itoa(conf.GlobalConf.HttpPort), 1)
@@ -119,6 +115,136 @@ func generateConfig(entry conf.SerSubEntry) {
 	module = strings.Replace(module, "{bypassLanRule}", buildBypassLanRule(), 1)
 
 	storage.WriteConfigFileLocal(module, "config.json")
+}
+
+// buildProxyOutbound builds the "proxy" outbound JSON for the entry's protocol.
+func buildProxyOutbound(entry conf.SerSubEntry) string {
+	switch entry.ProtocolName() {
+	case "ss":
+		return buildSsOutbound(entry)
+	case "vless":
+		return buildVlessOutbound(entry)
+	default:
+		return buildVmessOutbound(entry)
+	}
+}
+
+func buildVmessOutbound(entry conf.SerSubEntry) string {
+	v := entry.Vmess
+	return `{
+      "tag": "proxy",
+      "protocol": "vmess",
+      "settings": {
+        "vnext": [
+          {
+            "address": ` + jsonStr(v.Addr) + `,
+            "port": ` + v.GetPort() + `,
+            "users": [
+              {
+                "id": ` + jsonStr(v.ID) + `,
+                "alterId": ` + strconv.Itoa(v.Aid) + `,
+                "email": "t@t.tt",
+                "security": "auto"
+              }
+            ]
+          }
+        ]
+      },
+      "streamSettings": {
+        "network": ` + jsonStr(v.Net) + `
+      },
+      "mux": {
+        "enabled": false,
+        "concurrency": -1
+      }
+    }`
+}
+
+func buildSsOutbound(entry conf.SerSubEntry) string {
+	v := entry.Vmess
+	return `{
+      "tag": "proxy",
+      "protocol": "shadowsocks",
+      "settings": {
+        "servers": [
+          {
+            "address": ` + jsonStr(v.Addr) + `,
+            "port": ` + v.GetPort() + `,
+            "method": ` + jsonStr(v.Method) + `,
+            "password": ` + jsonStr(v.Password) + `,
+            "email": "t@t.tt"
+          }
+        ]
+      }
+    }`
+}
+
+func buildVlessOutbound(entry conf.SerSubEntry) string {
+	v := entry.Vmess
+	security := v.Security
+	if security == "" {
+		security = "none"
+	}
+	out := `{
+      "tag": "proxy",
+      "protocol": "vless",
+      "settings": {
+        "vnext": [
+          {
+            "address": ` + jsonStr(v.Addr) + `,
+            "port": ` + v.GetPort() + `,
+            "users": [
+              {
+                "id": ` + jsonStr(v.ID) + `,
+                "encryption": "none",`
+	if v.Flow != "" {
+		out += `
+                "flow": ` + jsonStr(v.Flow) + `,`
+	}
+	out += `
+                "email": "t@t.tt"
+              }
+            ]
+          }
+        ]
+      },
+      "streamSettings": {
+        "network": ` + jsonStr(v.Net) + `,
+        "security": ` + jsonStr(security)
+	switch security {
+	case "reality":
+		out += `,
+        "realitySettings": {
+          "serverName": ` + jsonStr(v.Sni) + `,
+          "fingerprint": ` + jsonStr(v.Fp) + `,
+          "publicKey": ` + jsonStr(v.Pbk)
+		if v.Sid != "" {
+			out += `,
+          "shortId": ` + jsonStr(v.Sid)
+		}
+		if v.Spx != "" {
+			out += `,
+          "spiderX": ` + jsonStr(v.Spx)
+		}
+		out += `
+        }`
+	case "tls":
+		out += `,
+        "tlsSettings": {
+          "serverName": ` + jsonStr(v.Sni) + `,
+          "fingerprint": ` + jsonStr(v.Fp) + `,
+          "allowInsecure": false
+        }`
+	}
+	out += `
+      }
+    }`
+	return out
+}
+
+// jsonStr quotes a string for safe embedding in JSON.
+func jsonStr(s string) string {
+	return strconv.Quote(s)
 }
 
 func buildDomainList(domains []string) string {

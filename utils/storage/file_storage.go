@@ -134,33 +134,7 @@ var module = `{
     }
   ],
   "outbounds": [
-    {
-      "tag": "proxy",
-      "protocol": "vmess",
-      "settings": {
-        "vnext": [
-          {
-            "address": "{Add}",
-            "port": {Port},
-            "users": [
-              {
-                "id": "{ID}",
-                "alterId": {Aid},
-                "email": "t@t.tt",
-                "security": "auto"
-              }
-            ]
-          }
-        ]
-      },
-      "streamSettings": {
-        "network": "{Net}"
-      },
-      "mux": {
-        "enabled": false,
-        "concurrency": -1
-      }
-    },
+    {ProxyOutbound},
     {
       "tag": "direct",
       "protocol": "freedom",
