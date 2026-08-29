@@ -86,6 +86,7 @@ func printArgsHelp() {
   订阅管理 (-sub):
     -sub add {name} {url}         添加订阅
     -sub update {name}            更新订阅
+    -sub update {name} -hook {文件名} {参数...}   更新订阅后运行 /etc/v2sub/hooks/ 下的脚本(订阅名自动作为第一个参数)
     -sub update all               更新全部订阅
     -sub remove {name}            删除订阅
     -sub list                     查看订阅列表
@@ -129,6 +130,7 @@ func printSubHelp() {
 
   add {name} {url}      添加订阅
   update {name}         更新指定订阅
+  update {name} -hook {文件名} {参数...}   更新订阅后自动运行 /etc/v2sub/hooks/ 下的脚本, 订阅名自动作为第一个参数
   update all            更新全部订阅
   remove {name}         删除指定订阅
   list                  查看所有订阅`)
